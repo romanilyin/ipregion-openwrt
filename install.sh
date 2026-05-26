@@ -177,8 +177,8 @@ install_packages() {
 	fi
 
 	if is_luci_enabled; then
-		log "installing ipregion and luci-app-ipregion"
-		apk add $APK_FLAGS "$TMP_DIR/ipregion.apk" "$TMP_DIR/luci-app-ipregion.apk"
+		log "installing ipregion, luci-app-ipregion and Russian translation"
+		apk add $APK_FLAGS "$TMP_DIR/ipregion.apk" "$TMP_DIR/luci-app-ipregion.apk" "$TMP_DIR/luci-i18n-ipregion-ru.apk"
 	else
 		log "installing ipregion"
 		apk add $APK_FLAGS "$TMP_DIR/ipregion.apk"
@@ -212,6 +212,7 @@ fetch_release_metadata
 fetch_package ipregion
 if is_luci_enabled; then
 	fetch_package luci-app-ipregion
+	fetch_package luci-i18n-ipregion-ru
 fi
 install_packages
 post_install
