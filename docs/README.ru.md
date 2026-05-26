@@ -43,14 +43,14 @@ Installer скачивает `ipregion*.apk`, `luci-app-ipregion*.apk` и `luci-
 
 Опции:
 
-- `IPREGION_RELEASE=2026.5.26-2`: поставить конкретный GitHub release tag вместо `latest`.
+- `IPREGION_RELEASE=2026.5.26-3`: поставить конкретный GitHub release tag вместо `latest`.
 - `IPREGION_INSTALL_LUCI=0`: поставить только CLI/backend пакет.
 - `IPREGION_APK_UPDATE=0`: не запускать `apk update` перед установкой.
 
 Пример с фиксированным release:
 
 ```sh
-wget -qO- https://raw.githubusercontent.com/romanilyin/ipregion-openwrt/main/install.sh | IPREGION_RELEASE=2026.5.26-2 sh
+wget -qO- https://raw.githubusercontent.com/romanilyin/ipregion-openwrt/main/install.sh | IPREGION_RELEASE=2026.5.26-3 sh
 ```
 
 Ручная установка скачанных APK:
@@ -66,8 +66,10 @@ apk add --allow-untrusted ./ipregion-*.apk ./luci-app-ipregion-*.apk ./luci-i18n
 - Запускайте GeoIP, popular service, CDN и AI endpoint проверки с одной страницы.
 - Выбирайте IP mode, interface, SOCKS5 proxy, timeout и GeoIP mode.
 - Задавайте реальную страну, чтобы совпадающие значения подсвечивались оранжевым, а отличающиеся - синим.
+- AI-проверки показывают отдельные строки IPv4 и IPv6 для каждого провайдера в режиме `IPv4 и IPv6`; недоступные транспорты отображаются явно.
 - Смотрите прогресс во время выполнения.
-- Скачивайте JSON результата.
+- Скачивайте JSON результата. JSON содержит исходные IP-адреса.
+- Обновляйте пакет из GitHub Releases через карточку версии; защита от downgrade не даст установить более старый latest release.
 - Откройте `Services -> IP Region` для UCI-настроек по умолчанию.
 
 ## CLI
@@ -95,6 +97,7 @@ ipregion ai --provider google_gemini --json
 - `--geoip-mode lookup`: сначала определить egress IP роутера, затем попросить GeoIP API проверить этот IP.
 - `--geoip-mode route`: спросить поддерживаемые GeoIP API, какую страну они видят для самого запроса.
 - `ipregion ai --json`: безопасно проверить AI provider endpoint-ы без хранения или запроса API-ключей.
+- `ipregion ai --ip-mode both --json`: проверить каждого выбранного AI-провайдера отдельными IPv4 и IPv6 probe.
 
 Для SOCKS5 proxy checks:
 

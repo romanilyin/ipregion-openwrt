@@ -36,9 +36,6 @@ return view.extend({
 		s.addremove = false;
 		s.anonymous = true;
 
-		o = s.option(form.Flag, 'enabled', _('Enable'));
-		o.default = '1';
-
 		o = s.option(form.ListValue, 'group', _('Default group'));
 		o.value('all', _('All'));
 		o.value('primary', _('GeoIP services'));
@@ -111,14 +108,6 @@ return view.extend({
 		o = s.option(form.Flag, 'mask_ip', _('Mask IP addresses in UI'));
 		o.default = '1';
 
-		o = s.option(form.Value, 'cache_ttl', _('Cache TTL'));
-		o.datatype = 'uinteger';
-		o.default = '300';
-
-		o = s.option(form.Value, 'max_parallel', _('Max parallel checks'));
-		o.datatype = 'range(1,8)';
-		o.default = '3';
-
 		o = s.option(form.DynamicList, 'disabled_service', _('Disabled services'));
 		o.placeholder = 'GOOGLE_SEARCH_CAPTCHA';
 		o.validate = function(section_id, value) {
@@ -126,9 +115,6 @@ return view.extend({
 		};
 
 		o = s.option(form.Flag, 'debug', _('Debug logging'));
-		o.default = '0';
-
-		o = s.option(form.Flag, 'keep_logs', _('Keep logs'));
 		o.default = '0';
 
 		return m.render().then(function(node) {

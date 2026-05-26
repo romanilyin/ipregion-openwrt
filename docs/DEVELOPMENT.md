@@ -132,6 +132,7 @@ The public GitHub Release installer is `install.sh` at the repository root.
 - It downloads `ipregion*.apk`, `luci-app-ipregion*.apk` and `luci-i18n-ipregion-ru*.apk`.
 - It installs with `apk` and `--allow-untrusted` by default because GitHub Release APKs are not from the official OpenWrt package repository.
 - It supports `IPREGION_RELEASE`, `IPREGION_INSTALL_LUCI`, `IPREGION_APK_UPDATE`, `IPREGION_REPO`, `IPREGION_GITHUB_API` and `IPREGION_APK_FLAGS`.
+- The LuCI update button is kept for public GitHub Release builds and is guarded against downgrades when the installed package is newer than the latest GitHub release.
 
 Before publishing a release:
 

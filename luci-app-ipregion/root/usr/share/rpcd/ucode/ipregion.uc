@@ -96,6 +96,9 @@ function read_command(args) {
 function downloader_args(url, timeout) {
 	timeout = '' + (timeout || 8);
 
+	if (command_exists('curl'))
+		return [ 'curl', '-fsSL', '--connect-timeout', timeout, '--max-time', timeout, url ];
+
 	if (command_exists('wget'))
 		return [ 'wget', '-T', timeout, '-q', '-O', '-', url ];
 
@@ -117,14 +120,28 @@ function ensure_run_dir() {
 	fs.mkdir(RUN_DIR);
 }
 
+function atomic_write(path, payload) {
+	let suffix = '' + time();
+	let now = clock(true);
+
+	if (type(now) == 'array')
+		suffix = '' + now[0] + '.' + now[1];
+
+	let tmp = path + '.tmp.' + suffix;
+	if (fs.writefile(tmp, payload) == null)
+		return null;
+
+	return fs.rename(tmp, path);
+}
+
 function write_state(state) {
 	ensure_run_dir();
-	fs.writefile(STATE_FILE, sprintf('%J\n', state));
+	atomic_write(STATE_FILE, sprintf('%J\n', state));
 }
 
 function write_update_state(state) {
 	ensure_run_dir();
-	fs.writefile(UPDATE_STATE_FILE, sprintf('%J\n', state));
+	atomic_write(UPDATE_STATE_FILE, sprintf('%J\n', state));
 }
 
 function process_alive(pid) {
@@ -253,6 +270,56 @@ function normalize_version(value) {
 	return value;
 }
 
+function parse_version(value) {
+	value = normalize_version(value);
+	if (value == null)
+		return null;
+
+	let release = 0;
+	let dash = index(value, '-');
+	if (dash >= 0) {
+		release = int(substr(value, dash + 1));
+		value = substr(value, 0, dash);
+	}
+
+	let parts = split(value, '.');
+	if (length(parts) != 3)
+		return null;
+
+	let out = [];
+	for (let part in parts) {
+		let number = int(part);
+		if (number != number)
+			return null;
+
+		push(out, number);
+	}
+
+	if (release != release)
+		return null;
+
+	push(out, release);
+	return out;
+}
+
+function compare_versions(left, right) {
+	let a = parse_version(left);
+	let b = parse_version(right);
+
+	if (a == null || b == null)
+		return null;
+
+	for (let i = 0; i < 4; i++) {
+		if (a[i] < b[i])
+			return -1;
+
+		if (a[i] > b[i])
+			return 1;
+	}
+
+	return 0;
+}
+
 function update_state() {
 	let state = read_json_file(UPDATE_STATE_FILE, { running: false, log_file: UPDATE_LOG_FILE });
 
@@ -296,8 +363,15 @@ function version_info() {
 		status = 'installed_not_found';
 	else if (current_norm == latest_norm)
 		status = 'latest';
-	else
-		status = 'update_available';
+	else {
+		let cmp = compare_versions(current_norm, latest_norm);
+		if (cmp == null)
+			status = 'version_mismatch';
+		else if (cmp < 0)
+			status = 'update_available';
+		else
+			status = 'latest_is_older';
+	}
 
 	return {
 		status: status,
@@ -523,7 +597,7 @@ const methods = {
 			};
 
 			ensure_run_dir();
-			fs.writefile(AI_STATE_FILE, sprintf('%J\n', state));
+			atomic_write(AI_STATE_FILE, sprintf('%J\n', state));
 			return state;
 		}
 	},
@@ -535,7 +609,7 @@ const methods = {
 			if (state.running && !process_alive(state.pid)) {
 				state.running = false;
 				state.finished_at = state.finished_at || time();
-				fs.writefile(AI_STATE_FILE, sprintf('%J\n', state));
+				atomic_write(AI_STATE_FILE, sprintf('%J\n', state));
 			}
 
 			return state;
@@ -563,7 +637,7 @@ const methods = {
 
 			state.running = false;
 			state.stopped_at = time();
-			fs.writefile(AI_STATE_FILE, sprintf('%J\n', state));
+			atomic_write(AI_STATE_FILE, sprintf('%J\n', state));
 
 			return state;
 		}
@@ -639,12 +713,16 @@ const methods = {
 			if (existing.running && process_alive(existing.pid))
 				return existing;
 
+			let info = version_info();
+			if (info.status != 'update_available')
+				return { running: false, ok: false, error: 'update_not_available', message: 'No newer GitHub release is available', status: info.status, current: info.current_normalized, latest: info.latest_normalized, release_url: info.release_url };
+
 			let args = downloader_args(INSTALLER_URL, 20);
 			if (args == null)
-				return { running: false, ok: false, error: 'downloader_not_found', message: 'wget or uclient-fetch is required' };
+				return { running: false, ok: false, error: 'downloader_not_found', message: 'curl, wget or uclient-fetch is required' };
 
 			ensure_run_dir();
-			let cmd = shell_cmd(args) + ' | IPREGION_RELEASE=latest sh > ' + shell_quote(UPDATE_LOG_FILE) + ' 2>&1 & echo $!';
+			let cmd = '( ' + shell_cmd(args) + ' | IPREGION_RELEASE=latest sh ) > ' + shell_quote(UPDATE_LOG_FILE) + ' 2>&1 & echo $!';
 			let pipe = fs.popen(cmd, 'r');
 			let pid = pipe ? int(trim_str(pipe.read('all') || '')) : 0;
 
