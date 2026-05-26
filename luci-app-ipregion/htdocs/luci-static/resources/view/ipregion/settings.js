@@ -95,10 +95,15 @@ return view.extend({
 		o = s.option(form.Value, 'proxy', _('SOCKS5 proxy'));
 		o.placeholder = '127.0.0.1:1080';
 		o.datatype = 'maxlength(255)';
+		o.description = _('Saved proxy shown on Status page. Enter host:port without socks5:// prefix, for example 127.0.0.1:1080.');
+		o.validate = function(section_id, value) {
+			return !value || /^[A-Za-z0-9_.-]+:[0-9]+$/.test(value) ? true : _('SOCKS5 proxy must be host:port, for example 127.0.0.1:1080');
+		};
 
 		o = s.option(form.ListValue, 'proxy_dns', _('SOCKS5 DNS mode'));
 		o.value('remote', _('Remote DNS'));
 		o.value('local', _('Local DNS'));
+		o.description = _('Remote DNS uses socks5h:// and resolves names through the proxy. Local DNS uses socks5:// and resolves names on the router.');
 		o.default = 'remote';
 
 		o = s.option(form.Value, 'interface', _('Interface'));

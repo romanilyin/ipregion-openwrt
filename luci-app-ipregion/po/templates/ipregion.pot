@@ -386,3 +386,21 @@ msgstr ""
 
 msgid "When IPv4 and IPv6 mode is selected, each provider gets separate IPv4 and IPv6 rows; unavailable transports are shown explicitly."
 msgstr ""
+
+msgid "Open settings"
+msgstr ""
+
+msgid "Remote DNS uses socks5h:// and resolves names through the proxy. Local DNS uses socks5:// and resolves names on the router."
+msgstr ""
+
+msgid "SOCKS5 proxy must be host:port, for example 127.0.0.1:1080"
+msgstr ""
+
+msgid "Saved proxy shown on Status page. Enter host:port without socks5:// prefix, for example 127.0.0.1:1080."
+msgstr ""
+
+msgid "Set the saved SOCKS5 proxy in Settings, then select it here for checks."
+msgstr ""
+
+msgid "Use saved SOCKS5 proxy"
+msgstr ""
