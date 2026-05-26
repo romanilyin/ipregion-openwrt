@@ -4,7 +4,7 @@
     "read": {
       "uci": [ "ipregion" ],
       "ubus": {
-        "luci.ipregion": [ "get_config", "list_services", "list_ai_providers", "list_interfaces", "status", "result", "log", "ai_status", "ai_result", "ai_log", "selftest", "version" ]
+        "luci.ipregion": [ "get_config", "list_services", "list_ai_providers", "list_interfaces", "detected_country", "status", "result", "log", "ai_status", "ai_result", "ai_log", "selftest", "version" ]
       }
     },
     "write": {

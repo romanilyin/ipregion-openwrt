@@ -110,6 +110,7 @@ Endpoint failures must remain per-service and must not abort the whole run.
 - The rpcd backend is `luci-app-ipregion/root/usr/share/rpcd/ucode/ipregion.uc`.
 - It returns `{ 'luci.ipregion': methods }`.
 - Keep ACL ubus object names aligned with that backend object.
+- The `detected_country` method only reads the latest local result file and must not start network checks from the settings page.
 - Do not grant generic exec access.
 - LuCI strings must use `_('...')`.
 - Translation sources are `po/templates/ipregion.pot` and `po/ru/ipregion.po`.

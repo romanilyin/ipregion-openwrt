@@ -7,6 +7,7 @@ var regionPollTimer = null;
 var aiPollTimer = null;
 var currentGeneratedAt = null;
 var aiGeneratedAt = null;
+var referenceCountry = '';
 
 var callGetConfig = rpc.declare({ object: 'luci.ipregion', method: 'get_config', expect: { '': {} } });
 var callInterfaces = rpc.declare({ object: 'luci.ipregion', method: 'list_interfaces', expect: { '': {} } });
@@ -34,6 +35,16 @@ function fieldValue(id) {
 
 function safeId(value) {
 	return String(value || '').replace(/[^A-Za-z0-9_-]/g, '-');
+}
+
+function normalizeCountryCode(value) {
+	value = String(value || '').trim().toUpperCase();
+	return /^[A-Z]{2}$/.test(value) ? value : '';
+}
+
+function countryFromValue(value) {
+	var match = String(value || '').trim().toUpperCase().match(/^([A-Z]{2})(?:$|[^A-Z])/);
+	return match ? match[1] : '';
 }
 
 function appendValue(parent, value) {
@@ -100,13 +111,24 @@ function resultCell(result) {
 	if (!result)
 		return E('span', {}, [ badge(null) ]);
 
-	return E('span', {}, [
-		badge(result),
-		result.value ? ' ' + result.value : '',
+	var valueNodes = [];
+	if (result.value) {
+		var country = result.status === 'ok' ? countryFromValue(result.value) : '';
+
+		if (country && referenceCountry)
+			valueNodes = [ ' ', E('span', {
+				'class': 'ipregion-country-badge ' + (country === referenceCountry ? 'ipregion-country-match' : 'ipregion-country-mismatch'),
+				'title': _('Reference country') + ': ' + referenceCountry
+			}, [ result.value ]) ];
+		else
+			valueNodes = [ ' ' + result.value ];
+	}
+
+	return E('span', {}, [ badge(result) ].concat(valueNodes, [
 		result.latency_ms != null ? E('span', { 'class': 'ipregion-muted' }, [ ' ', result.latency_ms + ' ms' ]) : '',
 		result.http_code ? E('span', { 'class': 'ipregion-muted' }, [ ' HTTP ', result.http_code ]) : '',
 		result.error ? E('span', { 'class': 'ipregion-muted' }, [ ' ', result.error ]) : ''
-	]);
+	]));
 }
 
 function groupDescription(group) {
@@ -552,6 +574,7 @@ return view.extend({
 		var aiState = data[6] || {};
 		var aiResult = data[7] || {};
 		var results = result.results || {};
+		referenceCountry = normalizeCountryCode(config.reference_country);
 
 		currentGeneratedAt = result.generated_at || null;
 		aiGeneratedAt = aiResult.generated_at || null;

@@ -70,6 +70,15 @@
 	text-align: center;
 }
 
+.ipregion-country-badge {
+	display: inline-block;
+	min-width: 2.5em;
+	padding: .15rem .4rem;
+	border-radius: 999px;
+	font-size: .85em;
+	text-align: center;
+}
+
 .ipregion-ok {
 	background: rgba(46, 204, 113, .18);
 	color: #1f8f4d;
@@ -88,6 +97,16 @@
 .ipregion-na {
 	background: rgba(127, 127, 127, .16);
 	color: #666;
+}
+
+.ipregion-country-match {
+	background: rgba(230, 126, 34, .22);
+	color: #a35400;
+}
+
+.ipregion-country-mismatch {
+	background: rgba(52, 152, 219, .18);
+	color: #1f6fa5;
 }
 
 .ipregion-muted {

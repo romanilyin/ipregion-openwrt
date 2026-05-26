@@ -67,6 +67,7 @@ Open `Status -> IP Region` in LuCI.
 
 - Run GeoIP, popular service, CDN and AI endpoint checks from one page.
 - Choose IP mode, interface, SOCKS5 proxy, timeout and GeoIP mode.
+- Set a reference country to highlight matching country values in orange and different country values in blue.
 - View progress while checks run.
 - Download JSON results.
 - Open `Services -> IP Region` for default UCI settings.
