@@ -4,7 +4,7 @@
 
 ## Scope
 
-- Целевая версия OpenWrt: `25.12.4+`.
+- Целевая версия OpenWrt: `25.12.1+`.
 - Runtime-примеры используют `apk`.
 - `ipregion` это CLI/backend пакет на `ucode`.
 - `luci-app-ipregion` это LuCI-приложение через узкий rpcd/ubus API.
@@ -34,7 +34,7 @@ CI workflow тоже запускает эти проверки, но billing и
 
 ## SDK Build Smoke
 
-Из OpenWrt 25.12.4+ buildroot или SDK, где доступен этот package feed:
+Из OpenWrt 25.12.1+ buildroot или SDK, где доступен этот package feed:
 
 ```sh
 make package/ipregion/compile V=s
