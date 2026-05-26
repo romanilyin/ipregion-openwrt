@@ -1,0 +1,17 @@
+{
+  "luci-app-ipregion": {
+    "description": "Grant access to LuCI IP Region diagnostics",
+    "read": {
+      "uci": [ "ipregion" ],
+      "ubus": {
+        "luci.ipregion": [ "get_config", "list_services", "list_ai_providers", "list_interfaces", "status", "result", "log", "ai_status", "ai_result", "ai_log", "selftest", "version" ]
+      }
+    },
+    "write": {
+      "uci": [ "ipregion" ],
+      "ubus": {
+        "luci.ipregion": [ "start", "stop", "clear", "ai_start", "ai_stop", "ai_clear", "update" ]
+      }
+    }
+  }
+}

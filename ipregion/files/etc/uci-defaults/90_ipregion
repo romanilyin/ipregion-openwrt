@@ -1,0 +1,26 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+
+uci -q get ipregion.main >/dev/null && exit 0
+
+uci -q batch <<'EOF'
+set ipregion.main=ipregion
+set ipregion.main.enabled='1'
+set ipregion.main.group='all'
+set ipregion.main.ip_mode='auto'
+set ipregion.main.geoip_mode='lookup'
+set ipregion.main.timeout='5'
+set ipregion.main.retries='1'
+set ipregion.main.proxy=''
+set ipregion.main.proxy_dns='remote'
+set ipregion.main.interface=''
+set ipregion.main.mask_ip='1'
+set ipregion.main.cache_ttl='300'
+set ipregion.main.max_parallel='3'
+set ipregion.main.debug='0'
+set ipregion.main.keep_logs='0'
+add_list ipregion.main.disabled_service='GOOGLE_SEARCH_CAPTCHA'
+commit ipregion
+EOF
+
+exit 0

@@ -1,0 +1,341 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: luci-app-ipregion\n"
+"POT-Creation-Date: 2026-05-26 00:00+0000\n"
+"PO-Revision-Date: 2026-05-26 00:00+0000\n"
+"Last-Translator: Roman Ilyin\n"
+"Language-Team: Russian\n"
+"Language: ru\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "All"
+msgstr "Все"
+
+msgid "All groups run every enabled GeoIP, popular service and CDN check."
+msgstr "Все группы запускают все включенные проверки GeoIP, популярных сервисов и CDN."
+
+msgid "All AI providers"
+msgstr "Все AI-провайдеры"
+
+msgid "All providers"
+msgstr "Все провайдеры"
+
+msgid "AI category"
+msgstr "Категория AI"
+
+msgid "AI provider check started"
+msgstr "Проверка AI-провайдеров запущена"
+
+msgid "AI provider checks use the same IP mode, interface, proxy and timeout controls above."
+msgstr "AI-проверки используют выбранные выше режим IP, интерфейс, прокси и таймаут."
+
+msgid "AI provider endpoint results"
+msgstr "Результаты endpoint-ов AI-провайдеров"
+
+msgid "AI Providers"
+msgstr "AI-провайдеры"
+
+msgid "ASN"
+msgstr "ASN"
+
+msgid "Auto"
+msgstr "Авто"
+
+msgid "Cache TTL"
+msgstr "TTL кэша"
+
+msgid "CDN services"
+msgstr "CDN-сервисы"
+
+msgid "CDN services check which CDN edge or region the router reaches, for example Cloudflare, YouTube or Netflix."
+msgstr "CDN-сервисы проверяют, до какого CDN edge или региона доходит роутер, например Cloudflare, YouTube или Netflix."
+
+msgid "Category"
+msgstr "Категория"
+
+msgid "Check how GeoIP, streaming and CDN services detect this router."
+msgstr "Проверяет, как GeoIP, стриминговые и CDN-сервисы видят этот роутер."
+
+msgid "Check how GeoIP, streaming, CDN and AI services detect this router."
+msgstr "Проверяет, как GeoIP, стриминговые, CDN и AI-сервисы видят этот роутер."
+
+msgid "Check discovered IP"
+msgstr "Проверять обнаруженный IP"
+
+msgid "Check service-visible route"
+msgstr "Проверять маршрут глазами сервиса"
+
+msgid "Check whether popular AI API endpoints are reachable through this router, interface or SOCKS5 proxy."
+msgstr "Проверяет, доступны ли популярные AI API endpoint-ы через этот роутер, интерфейс или SOCKS5-прокси."
+
+msgid "Check whether popular AI API endpoints are reachable through the selected route."
+msgstr "Проверяет, доступны ли популярные AI API endpoint-ы через выбранный маршрут."
+
+msgid "China and Asia AI providers"
+msgstr "AI-провайдеры Китая и Азии"
+
+msgid "Clear cache"
+msgstr "Очистить кэш"
+
+msgid "Close"
+msgstr "Закрыть"
+
+msgid "Configure default diagnostics options."
+msgstr "Настройка параметров диагностики по умолчанию."
+
+msgid "Country"
+msgstr "Страна"
+
+msgid "Current check"
+msgstr "Текущая проверка"
+
+msgid "Debug logging"
+msgstr "Отладочный лог"
+
+msgid "Default group"
+msgstr "Группа по умолчанию"
+
+msgid "Default route"
+msgstr "Маршрут по умолчанию"
+
+msgid "Disabled services"
+msgstr "Отключенные сервисы"
+
+msgid "Download JSON"
+msgstr "Скачать JSON"
+
+msgid "Diagnosis"
+msgstr "Диагностика"
+
+msgid "Enable"
+msgstr "Включить"
+
+msgid "Each row checks the actual provider endpoint domain. With split routing, this can differ from the generic egress check below."
+msgstr "Каждая строка проверяет реальный домен endpoint-а провайдера. При split routing это может отличаться от общей проверки исходящего IP ниже."
+
+msgid "Generic egress check"
+msgstr "Общая проверка исходящего IP"
+
+msgid "Errors"
+msgstr "Ошибки"
+
+msgid "GeoIP services"
+msgstr "GeoIP-сервисы"
+
+msgid "GeoIP services query public geolocation APIs and registries to see what country they assign to the router IP."
+msgstr "GeoIP-сервисы обращаются к публичным геолокационным API и реестрам, чтобы узнать, какую страну они назначают IP-адресу роутера."
+
+msgid "GeoIP lookup checks the discovered router IP. Service-visible route asks supported GeoIP APIs what country they see for this exact request path."
+msgstr "GeoIP lookup проверяет обнаруженный IP роутера. Режим маршрута спрашивает поддерживаемые GeoIP API, какую страну они видят для этого конкретного запроса."
+
+msgid "GeoIP mode"
+msgstr "Режим GeoIP"
+
+msgid "Global AI providers"
+msgstr "Глобальные AI-провайдеры"
+
+msgid "Group"
+msgstr "Группа"
+
+msgid "HTTP"
+msgstr "HTTP"
+
+msgid "Idle"
+msgstr "Ожидание"
+
+msgid "Interface"
+msgstr "Интерфейс"
+
+msgid "IP mode"
+msgstr "Режим IP"
+
+msgid "IP Region"
+msgstr "IP Region"
+
+msgid "IP Region check started"
+msgstr "Проверка IP Region запущена"
+
+msgid "IP"
+msgstr "IP"
+
+msgid "GitHub version not found"
+msgstr "Версия на GitHub не найдена"
+
+msgid "GitHub repository"
+msgstr "Репозиторий GitHub"
+
+msgid "Installed version"
+msgstr "Установленная версия"
+
+msgid "Installed version not found"
+msgstr "Установленная версия не найдена"
+
+msgid "IPv4"
+msgstr "IPv4"
+
+msgid "IPv4 and IPv6"
+msgstr "IPv4 и IPv6"
+
+msgid "IPv4 only"
+msgstr "Только IPv4"
+
+msgid "IPv4 value/status"
+msgstr "IPv4 значение/статус"
+
+msgid "IPv6"
+msgstr "IPv6"
+
+msgid "IPv6 only"
+msgstr "Только IPv6"
+
+msgid "IPv6 value/status"
+msgstr "IPv6 значение/статус"
+
+msgid "Keep logs"
+msgstr "Сохранять логи"
+
+msgid "Last check"
+msgstr "Последняя проверка"
+
+msgid "Latest GitHub version"
+msgstr "Последняя версия на GitHub"
+
+msgid "Latest version installed"
+msgstr "Установлена последняя версия"
+
+msgid "Local DNS"
+msgstr "Локальный DNS"
+
+msgid "Log is empty"
+msgstr "Лог пуст"
+
+msgid "Mask IP addresses in UI"
+msgstr "Маскировать IP-адреса в UI"
+
+msgid "Max parallel checks"
+msgstr "Максимум параллельных проверок"
+
+msgid "N/A"
+msgstr "Н/Д"
+
+msgid "Network"
+msgstr "Сеть"
+
+msgid "No proxy"
+msgstr "Без прокси"
+
+msgid "No results yet"
+msgstr "Результатов пока нет"
+
+msgid "Open status page"
+msgstr "Открыть страницу статуса"
+
+msgid "PID"
+msgstr "PID"
+
+msgid "Popular services"
+msgstr "Популярные сервисы"
+
+msgid "Popular services contact major platforms to see which region, access state or country their web/API endpoints report for this route."
+msgstr "Популярные сервисы обращаются к крупным платформам и показывают, какой регион, доступ или страну их веб/API-эндпоинты видят для этого маршрута."
+
+msgid "Progress"
+msgstr "Прогресс"
+
+msgid "Package version"
+msgstr "Версия пакета"
+
+msgid "Provider"
+msgstr "Провайдер"
+
+msgid "Proxy"
+msgstr "Прокси"
+
+msgid "Refresh result"
+msgstr "Обновить результат"
+
+msgid "Remote DNS"
+msgstr "Удаленный DNS"
+
+msgid "Retries"
+msgstr "Повторы"
+
+msgid "Run check"
+msgstr "Запустить проверку"
+
+msgid "Run AI check"
+msgstr "Запустить AI-проверку"
+
+msgid "Run checks and inspect results on the Status page."
+msgstr "Запускайте проверки и смотрите результаты на странице статуса."
+
+msgid "Running"
+msgstr "Выполняется"
+
+msgid "Runtime log"
+msgstr "Лог выполнения"
+
+msgid "Runtime state"
+msgstr "Состояние выполнения"
+
+msgid "Saved SOCKS5 proxy"
+msgstr "Сохраненный SOCKS5-прокси"
+
+msgid "Safe mode is used by default. It does not store API keys and only checks whether provider endpoint domains are reachable through their selected routes."
+msgstr "По умолчанию используется безопасный режим. Он не хранит API-ключи и только проверяет доступность доменов endpoint-ов провайдеров через выбранные для них маршруты."
+
+msgid "Self-test"
+msgstr "Самопроверка"
+
+msgid "Service"
+msgstr "Сервис"
+
+msgid "Service id must contain only uppercase letters, numbers and underscores"
+msgstr "ID сервиса должен содержать только заглавные латинские буквы, цифры и подчеркивания"
+
+msgid "Settings"
+msgstr "Настройки"
+
+msgid "Show log"
+msgstr "Показать лог"
+
+msgid "SOCKS5 DNS mode"
+msgstr "Режим DNS для SOCKS5"
+
+msgid "SOCKS5 proxy"
+msgstr "SOCKS5-прокси"
+
+msgid "Stop"
+msgstr "Остановить"
+
+msgid "Status"
+msgstr "Статус"
+
+msgid "Timeout"
+msgstr "Таймаут"
+
+msgid "This is a generic IP/ASN check for the selected route. In domain-based split routing, individual AI provider endpoints may use a different VPN route; check the provider rows above."
+msgstr "Это общая проверка IP/ASN для выбранного маршрута. При split routing по доменам отдельные AI endpoint-ы могут идти через другой VPN-маршрут; смотрите строки провайдеров выше."
+
+msgid "Time"
+msgstr "Время"
+
+msgid "Update available"
+msgstr "Доступно обновление"
+
+msgid "Update failed to start"
+msgstr "Не удалось запустить обновление"
+
+msgid "Update is running"
+msgstr "Обновление выполняется"
+
+msgid "Update package"
+msgstr "Обновить пакет"
+
+msgid "Update started"
+msgstr "Обновление запущено"
+
+msgid "Where to see results"
+msgstr "Где смотреть результаты"

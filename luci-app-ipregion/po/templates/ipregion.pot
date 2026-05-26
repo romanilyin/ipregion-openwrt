@@ -1,0 +1,340 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: luci-app-ipregion\n"
+"POT-Creation-Date: 2026-05-26 00:00+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "All"
+msgstr ""
+
+msgid "All groups run every enabled GeoIP, popular service and CDN check."
+msgstr ""
+
+msgid "All AI providers"
+msgstr ""
+
+msgid "All providers"
+msgstr ""
+
+msgid "AI category"
+msgstr ""
+
+msgid "AI provider check started"
+msgstr ""
+
+msgid "AI provider checks use the same IP mode, interface, proxy and timeout controls above."
+msgstr ""
+
+msgid "AI provider endpoint results"
+msgstr ""
+
+msgid "AI Providers"
+msgstr ""
+
+msgid "ASN"
+msgstr ""
+
+msgid "Auto"
+msgstr ""
+
+msgid "Cache TTL"
+msgstr ""
+
+msgid "CDN services"
+msgstr ""
+
+msgid "CDN services check which CDN edge or region the router reaches, for example Cloudflare, YouTube or Netflix."
+msgstr ""
+
+msgid "Category"
+msgstr ""
+
+msgid "Check how GeoIP, streaming and CDN services detect this router."
+msgstr ""
+
+msgid "Check how GeoIP, streaming, CDN and AI services detect this router."
+msgstr ""
+
+msgid "Check discovered IP"
+msgstr ""
+
+msgid "Check service-visible route"
+msgstr ""
+
+msgid "Check whether popular AI API endpoints are reachable through this router, interface or SOCKS5 proxy."
+msgstr ""
+
+msgid "Check whether popular AI API endpoints are reachable through the selected route."
+msgstr ""
+
+msgid "China and Asia AI providers"
+msgstr ""
+
+msgid "Clear cache"
+msgstr ""
+
+msgid "Close"
+msgstr ""
+
+msgid "Configure default diagnostics options."
+msgstr ""
+
+msgid "Country"
+msgstr ""
+
+msgid "Current check"
+msgstr ""
+
+msgid "Debug logging"
+msgstr ""
+
+msgid "Default group"
+msgstr ""
+
+msgid "Default route"
+msgstr ""
+
+msgid "Disabled services"
+msgstr ""
+
+msgid "Download JSON"
+msgstr ""
+
+msgid "Diagnosis"
+msgstr ""
+
+msgid "Enable"
+msgstr ""
+
+msgid "Each row checks the actual provider endpoint domain. With split routing, this can differ from the generic egress check below."
+msgstr ""
+
+msgid "Generic egress check"
+msgstr ""
+
+msgid "Errors"
+msgstr ""
+
+msgid "GeoIP services"
+msgstr ""
+
+msgid "GeoIP services query public geolocation APIs and registries to see what country they assign to the router IP."
+msgstr ""
+
+msgid "GeoIP lookup checks the discovered router IP. Service-visible route asks supported GeoIP APIs what country they see for this exact request path."
+msgstr ""
+
+msgid "GeoIP mode"
+msgstr ""
+
+msgid "Global AI providers"
+msgstr ""
+
+msgid "Group"
+msgstr ""
+
+msgid "HTTP"
+msgstr ""
+
+msgid "Idle"
+msgstr ""
+
+msgid "Interface"
+msgstr ""
+
+msgid "IP mode"
+msgstr ""
+
+msgid "IP Region"
+msgstr ""
+
+msgid "IP Region check started"
+msgstr ""
+
+msgid "IP"
+msgstr ""
+
+msgid "GitHub version not found"
+msgstr ""
+
+msgid "GitHub repository"
+msgstr ""
+
+msgid "Installed version"
+msgstr ""
+
+msgid "Installed version not found"
+msgstr ""
+
+msgid "IPv4"
+msgstr ""
+
+msgid "IPv4 and IPv6"
+msgstr ""
+
+msgid "IPv4 only"
+msgstr ""
+
+msgid "IPv4 value/status"
+msgstr ""
+
+msgid "IPv6"
+msgstr ""
+
+msgid "IPv6 only"
+msgstr ""
+
+msgid "IPv6 value/status"
+msgstr ""
+
+msgid "Keep logs"
+msgstr ""
+
+msgid "Last check"
+msgstr ""
+
+msgid "Latest GitHub version"
+msgstr ""
+
+msgid "Latest version installed"
+msgstr ""
+
+msgid "Local DNS"
+msgstr ""
+
+msgid "Log is empty"
+msgstr ""
+
+msgid "Mask IP addresses in UI"
+msgstr ""
+
+msgid "Max parallel checks"
+msgstr ""
+
+msgid "N/A"
+msgstr ""
+
+msgid "Network"
+msgstr ""
+
+msgid "No proxy"
+msgstr ""
+
+msgid "No results yet"
+msgstr ""
+
+msgid "Open status page"
+msgstr ""
+
+msgid "PID"
+msgstr ""
+
+msgid "Popular services"
+msgstr ""
+
+msgid "Popular services contact major platforms to see which region, access state or country their web/API endpoints report for this route."
+msgstr ""
+
+msgid "Progress"
+msgstr ""
+
+msgid "Package version"
+msgstr ""
+
+msgid "Provider"
+msgstr ""
+
+msgid "Proxy"
+msgstr ""
+
+msgid "Refresh result"
+msgstr ""
+
+msgid "Remote DNS"
+msgstr ""
+
+msgid "Retries"
+msgstr ""
+
+msgid "Run check"
+msgstr ""
+
+msgid "Run AI check"
+msgstr ""
+
+msgid "Run checks and inspect results on the Status page."
+msgstr ""
+
+msgid "Running"
+msgstr ""
+
+msgid "Runtime log"
+msgstr ""
+
+msgid "Runtime state"
+msgstr ""
+
+msgid "Saved SOCKS5 proxy"
+msgstr ""
+
+msgid "Safe mode is used by default. It does not store API keys and only checks whether provider endpoint domains are reachable through their selected routes."
+msgstr ""
+
+msgid "Self-test"
+msgstr ""
+
+msgid "Service"
+msgstr ""
+
+msgid "Service id must contain only uppercase letters, numbers and underscores"
+msgstr ""
+
+msgid "Settings"
+msgstr ""
+
+msgid "Show log"
+msgstr ""
+
+msgid "SOCKS5 DNS mode"
+msgstr ""
+
+msgid "SOCKS5 proxy"
+msgstr ""
+
+msgid "Stop"
+msgstr ""
+
+msgid "Status"
+msgstr ""
+
+msgid "Timeout"
+msgstr ""
+
+msgid "This is a generic IP/ASN check for the selected route. In domain-based split routing, individual AI provider endpoints may use a different VPN route; check the provider rows above."
+msgstr ""
+
+msgid "Time"
+msgstr ""
+
+msgid "Update available"
+msgstr ""
+
+msgid "Update failed to start"
+msgstr ""
+
+msgid "Update is running"
+msgstr ""
+
+msgid "Update package"
+msgstr ""
+
+msgid "Update started"
+msgstr ""
+
+msgid "Where to see results"
+msgstr ""

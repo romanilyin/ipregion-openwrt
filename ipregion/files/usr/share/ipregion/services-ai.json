@@ -1,0 +1,119 @@
+[
+  {
+    "id": "openai",
+    "name": "OpenAI API",
+    "category": "ai",
+    "kind": "api",
+    "url": "https://api.openai.com/v1/models",
+    "method": "GET",
+    "auth": { "type": "bearer", "env": "OPENAI_API_KEY", "optional": true },
+    "headers": {},
+    "success_status": [200],
+    "reachable_status": [401, 403, 429],
+    "request_id_headers": ["x-request-id"],
+    "region_error_patterns": [
+      "unsupported_country_region_territory",
+      "Country, region, or territory not supported"
+    ]
+  },
+  {
+    "id": "anthropic",
+    "name": "Anthropic Claude API",
+    "category": "ai",
+    "kind": "api",
+    "url": "https://api.anthropic.com/v1/models",
+    "method": "GET",
+    "auth": { "type": "x-api-key", "env": "ANTHROPIC_API_KEY", "optional": true },
+    "headers": {
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json"
+    },
+    "success_status": [200],
+    "reachable_status": [401, 403, 429],
+    "request_id_headers": ["request-id"]
+  },
+  {
+    "id": "google_gemini",
+    "name": "Google Gemini API",
+    "category": "ai",
+    "kind": "api",
+    "url": "https://generativelanguage.googleapis.com/v1beta/models",
+    "method": "GET",
+    "auth": { "type": "query", "name": "key", "env": "GEMINI_API_KEY", "optional": true },
+    "headers": {},
+    "success_status": [200],
+    "reachable_status": [400, 401, 403, 404, 429]
+  },
+  {
+    "id": "deepseek",
+    "name": "DeepSeek API",
+    "category": "ai_china",
+    "kind": "openai_compatible",
+    "url": "https://api.deepseek.com/models",
+    "method": "GET",
+    "auth": { "type": "bearer", "env": "DEEPSEEK_API_KEY", "optional": true },
+    "headers": {},
+    "success_status": [200],
+    "reachable_status": [401, 403, 404, 405, 429]
+  },
+  {
+    "id": "qwen_singapore",
+    "name": "Qwen / DashScope Singapore",
+    "category": "ai_china",
+    "kind": "openai_compatible",
+    "url": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/models",
+    "method": "GET",
+    "auth": { "type": "bearer", "env": "DASHSCOPE_API_KEY", "optional": true },
+    "headers": {},
+    "success_status": [200],
+    "reachable_status": [401, 403, 404, 405, 429]
+  },
+  {
+    "id": "qwen_beijing",
+    "name": "Qwen / DashScope China Beijing",
+    "category": "ai_china",
+    "kind": "openai_compatible",
+    "url": "https://dashscope.aliyuncs.com/compatible-mode/v1/models",
+    "method": "GET",
+    "auth": { "type": "bearer", "env": "DASHSCOPE_API_KEY", "optional": true },
+    "headers": {},
+    "success_status": [200],
+    "reachable_status": [401, 403, 404, 405, 429]
+  },
+  {
+    "id": "kimi",
+    "name": "Kimi / Moonshot",
+    "category": "ai_china",
+    "kind": "openai_compatible",
+    "url": "https://api.moonshot.cn/v1/models",
+    "method": "GET",
+    "auth": { "type": "bearer", "env": "MOONSHOT_API_KEY", "optional": true },
+    "headers": {},
+    "success_status": [200],
+    "reachable_status": [401, 403, 404, 405, 429]
+  },
+  {
+    "id": "baidu_qianfan",
+    "name": "Baidu Qianfan / ERNIE",
+    "category": "ai_china",
+    "kind": "openai_compatible",
+    "url": "https://api.baiduqianfan.ai/v1/models",
+    "method": "GET",
+    "auth": { "type": "bearer", "env": "QIANFAN_API_KEY", "optional": true },
+    "headers": {},
+    "success_status": [200],
+    "reachable_status": [401, 403, 404, 405, 429]
+  },
+  {
+    "id": "zhipu_glm",
+    "name": "Zhipu / GLM",
+    "category": "ai_china",
+    "kind": "openai_compatible",
+    "url": "https://open.bigmodel.cn/api/paas/v4/models",
+    "method": "GET",
+    "auth": { "type": "bearer", "env": "ZHIPU_API_KEY", "optional": true },
+    "headers": {},
+    "success_status": [200],
+    "reachable_status": [401, 403, 404, 405, 429]
+  }
+]

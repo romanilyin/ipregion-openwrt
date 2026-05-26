@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  static:
+    name: Static checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run static checks
+        run: scripts/ci/static-checks.sh
+
+  ucode:
+    name: ucode syntax checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake git pkg-config libjson-c-dev nodejs
+
+      - name: Build local ucode with UCI support
+        run: scripts/ci/build-ucode.sh /tmp/ipregion-ucode-install
+
+      - name: Run ucode checks
+        run: scripts/ci/ucode-checks.sh /tmp/ipregion-ucode-install/bin/ucode

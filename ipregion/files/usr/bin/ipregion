@@ -1,0 +1,4 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+
+exec /usr/bin/ucode /usr/share/ipregion/ipregion.uc "$@"

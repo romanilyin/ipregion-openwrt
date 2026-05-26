@@ -1,0 +1,104 @@
+.ipregion-page {
+	max-width: 1180px;
+}
+
+.ipregion-hero {
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+	margin-bottom: 1rem;
+}
+
+.ipregion-logo {
+	width: 64px;
+	height: 64px;
+	object-fit: contain;
+	border-radius: 16px;
+}
+
+.ipregion-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: .5rem;
+	margin: 1rem 0;
+}
+
+.ipregion-options {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+	gap: .75rem;
+}
+
+.ipregion-options label {
+	display: flex;
+	flex-direction: column;
+	gap: .25rem;
+	font-weight: 600;
+}
+
+.ipregion-highlight-label {
+	padding: .55rem;
+	border: 1px solid rgba(52, 152, 219, .35);
+	border-radius: 8px;
+	background: rgba(52, 152, 219, .08);
+}
+
+.ipregion-options select,
+.ipregion-options input {
+	width: 100%;
+}
+
+.ipregion-group-help {
+	grid-column: 1 / -1;
+	margin: 0;
+}
+
+.ipregion-card {
+	margin: 1rem 0;
+	padding: 1rem;
+	border: 1px solid rgba(127, 127, 127, .25);
+	border-radius: 10px;
+	background: rgba(127, 127, 127, .05);
+}
+
+.ipregion-badge {
+	display: inline-block;
+	min-width: 4.5em;
+	padding: .15rem .4rem;
+	border-radius: 999px;
+	font-size: .85em;
+	text-align: center;
+}
+
+.ipregion-ok {
+	background: rgba(46, 204, 113, .18);
+	color: #1f8f4d;
+}
+
+.ipregion-warn {
+	background: rgba(241, 196, 15, .2);
+	color: #947600;
+}
+
+.ipregion-error {
+	background: rgba(231, 76, 60, .18);
+	color: #b83224;
+}
+
+.ipregion-na {
+	background: rgba(127, 127, 127, .16);
+	color: #666;
+}
+
+.ipregion-muted {
+	color: #777;
+	font-size: .85em;
+}
+
+.ipregion-error-card {
+	border-color: rgba(231, 76, 60, .45);
+}
+
+.ipregion-ai-hero {
+	margin-top: 1.5rem;
+}

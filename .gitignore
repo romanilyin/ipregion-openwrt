@@ -1,0 +1,8 @@
+ipregion_original/
+.env
+*.apk
+*.ipk
+*.log
+uc.out
+*.uc.out
+AGENTS.md 
