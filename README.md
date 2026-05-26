@@ -45,14 +45,14 @@ The installer downloads `ipregion*.apk`, `luci-app-ipregion*.apk` and `luci-i18n
 
 Options:
 
-- `IPREGION_RELEASE=2026.5.26-1`: install a specific GitHub release tag instead of `latest`.
+- `IPREGION_RELEASE=2026.5.26-2`: install a specific GitHub release tag instead of `latest`.
 - `IPREGION_INSTALL_LUCI=0`: install only the CLI/backend package.
 - `IPREGION_APK_UPDATE=0`: skip `apk update` before installation.
 
 Pinned release example:
 
 ```sh
-wget -qO- https://raw.githubusercontent.com/romanilyin/ipregion-openwrt/main/install.sh | IPREGION_RELEASE=2026.5.26-1 sh
+wget -qO- https://raw.githubusercontent.com/romanilyin/ipregion-openwrt/main/install.sh | IPREGION_RELEASE=2026.5.26-2 sh
 ```
 
 Manual install from downloaded APK files:
