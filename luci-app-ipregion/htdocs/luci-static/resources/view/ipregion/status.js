@@ -354,10 +354,11 @@ function renderOptions(config, interfaces) {
 			return E('option', { 'value': item.name || '', 'selected': (item.name || '') === iface ? 'selected' : null }, [ item.label || item.name || _('Default route') ]);
 		})) ]),
 		E('label', {}, [ _('Proxy'), E('select', { 'id': 'ipregion-proxy' }, [
-			E('option', { 'value': '', 'selected': !proxy ? 'selected' : null }, [ _('No proxy') ]),
-			E('option', { 'value': proxy, 'selected': proxy ? 'selected' : null, 'disabled': proxy ? null : 'disabled' }, [ proxy ? _('Saved SOCKS5 proxy') + ' (' + proxy + ')' : _('Saved SOCKS5 proxy') ])
-		]) ]),
+			E('option', { 'value': '', 'selected': !proxy ? 'selected' : null }, [ _('No proxy') ])
+		].concat(proxy ? [ E('option', { 'value': proxy, 'selected': 'selected' }, [ _('Use saved SOCKS5 proxy') + ' (' + proxy + ')' ]) ] : [])) ]),
 		E('label', {}, [ _('Timeout'), E('input', { 'id': 'ipregion-timeout', 'type': 'number', 'min': '1', 'max': '60', 'value': config.timeout || '5' }) ]),
+		E('p', { 'class': 'ipregion-muted ipregion-group-help' }, [ _('Set the saved SOCKS5 proxy in Settings, then select it here for checks.') ]),
+		E('a', { 'class': 'btn cbi-button', 'href': L.url('admin/services/ipregion') }, [ _('Open settings') ]),
 		E('p', { 'id': 'ipregion-group-description', 'class': 'ipregion-muted ipregion-group-help' }, [ groupDescription(group) ]),
 		E('p', { 'class': 'ipregion-muted ipregion-group-help' }, [ _('GeoIP lookup checks the discovered router IP. Service-visible route asks supported GeoIP APIs what country they see for this exact request path.') ])
 	]);

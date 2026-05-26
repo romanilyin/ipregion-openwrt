@@ -387,3 +387,21 @@ msgstr "Обновление пакета устанавливает APK из Gi
 
 msgid "When IPv4 and IPv6 mode is selected, each provider gets separate IPv4 and IPv6 rows; unavailable transports are shown explicitly."
 msgstr "В режиме IPv4 и IPv6 каждый провайдер получает отдельные строки IPv4 и IPv6; недоступные транспорты показываются явно."
+
+msgid "Open settings"
+msgstr "Открыть настройки"
+
+msgid "Remote DNS uses socks5h:// and resolves names through the proxy. Local DNS uses socks5:// and resolves names on the router."
+msgstr "Удаленный DNS использует socks5h:// и резолвит имена через прокси. Локальный DNS использует socks5:// и резолвит имена на роутере."
+
+msgid "SOCKS5 proxy must be host:port, for example 127.0.0.1:1080"
+msgstr "SOCKS5 proxy должен быть в формате host:port, например 127.0.0.1:1080"
+
+msgid "Saved proxy shown on Status page. Enter host:port without socks5:// prefix, for example 127.0.0.1:1080."
+msgstr "Сохраненный proxy показывается на странице Status. Введите host:port без префикса socks5://, например 127.0.0.1:1080."
+
+msgid "Set the saved SOCKS5 proxy in Settings, then select it here for checks."
+msgstr "Задайте сохраненный SOCKS5 proxy в настройках, затем выберите его здесь для проверок."
+
+msgid "Use saved SOCKS5 proxy"
+msgstr "Использовать сохраненный SOCKS5 proxy"

@@ -45,14 +45,14 @@ The installer downloads `ipregion*.apk`, `luci-app-ipregion*.apk` and `luci-i18n
 
 Options:
 
-- `IPREGION_RELEASE=2026.5.26-4`: install a specific GitHub release tag instead of `latest`.
+- `IPREGION_RELEASE=2026.5.26-5`: install a specific GitHub release tag instead of `latest`.
 - `IPREGION_INSTALL_LUCI=0`: install only the CLI/backend package.
 - `IPREGION_APK_UPDATE=0`: skip `apk update` before installation.
 
 Pinned release example:
 
 ```sh
-wget -qO- https://raw.githubusercontent.com/romanilyin/ipregion-openwrt/main/install.sh | IPREGION_RELEASE=2026.5.26-4 sh
+wget -qO- https://raw.githubusercontent.com/romanilyin/ipregion-openwrt/main/install.sh | IPREGION_RELEASE=2026.5.26-5 sh
 ```
 
 Manual install from downloaded APK files:
@@ -67,6 +67,7 @@ Open `Status -> IP Region` in LuCI.
 
 - Run GeoIP, popular service, CDN and AI endpoint checks from one page.
 - Choose IP mode, interface, SOCKS5 proxy, timeout and GeoIP mode.
+- Configure the saved SOCKS5 proxy in `Services -> IP Region`, then select it on the Status page.
 - Set a reference country to highlight matching country values in orange and different country values in blue.
 - AI checks show separate IPv4 and IPv6 provider rows when `IPv4 and IPv6` mode is selected; unavailable transports are shown explicitly.
 - View progress while checks run.
