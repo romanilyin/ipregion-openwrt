@@ -99,7 +99,7 @@ function aiBadge(row) {
 		cls += ' ipregion-ok';
 	else if (status === 'forbidden' || status === 'rate_limited' || status === 'endpoint_reached_wrong_method' || status === 'server_error')
 		cls += ' ipregion-warn';
-	else if (status === 'skipped')
+	else if (status === 'skipped' || status === 'unavailable')
 		cls += ' ipregion-na';
 	else
 		cls += ' ipregion-error';
@@ -183,11 +183,16 @@ function renderGroup(title, group, rows, description) {
 	]);
 }
 
+function aiRowId(row) {
+	return safeId(row.row_id || ((row.id || row.name) + '-' + (row.transport || row.ip_version || '')));
+}
+
 function renderAiRow(row) {
-	var id = safeId(row.id || row.name);
+	var id = aiRowId(row);
 
 	return E('tr', { 'class': 'tr ipregion-ai-data-row', 'id': 'ipregion-ai-row-' + id }, [
 		E('td', { 'class': 'td' }, [ row.name || row.id ]),
+		E('td', { 'class': 'td', 'id': 'ipregion-ai-transport-' + id }, [ row.transport_label || row.transport || _('N/A') ]),
 		E('td', { 'class': 'td' }, [ row.category_label || row.category || '' ]),
 		E('td', { 'class': 'td', 'id': 'ipregion-ai-http-' + id }, [ String(row.http_code || 0) ]),
 		E('td', { 'class': 'td', 'id': 'ipregion-ai-status-' + id }, [ aiBadge(row) ]),
@@ -201,6 +206,7 @@ function renderAiTable(rows) {
 	var tableRows = [
 		E('tr', { 'class': 'tr table-titles' }, [
 			E('th', { 'class': 'th' }, [ _('Provider') ]),
+			E('th', { 'class': 'th' }, [ _('Transport') ]),
 			E('th', { 'class': 'th' }, [ _('Category') ]),
 			E('th', { 'class': 'th' }, [ _('HTTP') ]),
 			E('th', { 'class': 'th' }, [ _('Status') ]),
@@ -212,11 +218,12 @@ function renderAiTable(rows) {
 	if (rows.length)
 		rows.forEach(function(row) { tableRows.push(renderAiRow(row)); });
 	else
-		tableRows.push(E('tr', { 'class': 'tr ipregion-ai-empty-row', 'id': 'ipregion-ai-empty' }, [ E('td', { 'class': 'td', 'colspan': 6 }, [ _('No results yet') ]) ]));
+		tableRows.push(E('tr', { 'class': 'tr ipregion-ai-empty-row', 'id': 'ipregion-ai-empty' }, [ E('td', { 'class': 'td', 'colspan': 7 }, [ _('No results yet') ]) ]));
 
 	return E('div', { 'class': 'ipregion-card' }, [
 		E('h3', {}, [ _('AI provider endpoint results') ]),
 		E('p', { 'class': 'ipregion-muted' }, [ _('Each row checks the actual provider endpoint domain. With split routing, this can differ from the generic egress check below.') ]),
+		E('p', { 'class': 'ipregion-muted' }, [ _('When IPv4 and IPv6 mode is selected, each provider gets separate IPv4 and IPv6 rows; unavailable transports are shown explicitly.') ]),
 		E('table', { 'class': 'table', 'id': 'ipregion-ai-table' }, tableRows)
 	]);
 }
@@ -238,7 +245,7 @@ function clearAiRows() {
 
 	Array.prototype.slice.call(table.querySelectorAll('.ipregion-ai-data-row')).forEach(function(row) { row.remove(); });
 	if (!document.getElementById('ipregion-ai-empty'))
-		table.appendChild(E('tr', { 'class': 'tr ipregion-ai-empty-row', 'id': 'ipregion-ai-empty' }, [ E('td', { 'class': 'td', 'colspan': 6 }, [ _('No results yet') ]) ]));
+		table.appendChild(E('tr', { 'class': 'tr ipregion-ai-empty-row', 'id': 'ipregion-ai-empty' }, [ E('td', { 'class': 'td', 'colspan': 7 }, [ _('No results yet') ]) ]));
 }
 
 function resetResultUi() {
@@ -254,7 +261,8 @@ function resetResultUi() {
 function resetAiUi() {
 	aiGeneratedAt = null;
 	clearAiRows();
-	setContent('ipregion-ai-egress-ip', [ _('IP'), ': ', _('N/A') ]);
+	setContent('ipregion-ai-egress-ipv4', [ _('IPv4'), ': ', _('N/A') ]);
+	setContent('ipregion-ai-egress-ipv6', [ _('IPv6'), ': ', _('N/A') ]);
 	setContent('ipregion-ai-egress-country', [ _('Country'), ': ', _('N/A') ]);
 	setContent('ipregion-ai-egress-asn', [ _('ASN'), ': ', _('N/A') ]);
 	setContent('ipregion-ai-errors', '');
@@ -298,7 +306,7 @@ function updateAiRows(rows) {
 		empty.remove();
 
 	rows.forEach(function(row) {
-		var id = safeId(row.id || row.name);
+		var id = aiRowId(row);
 		var existing = document.getElementById('ipregion-ai-row-' + id);
 
 		if (!existing) {
@@ -306,6 +314,7 @@ function updateAiRows(rows) {
 			return;
 		}
 
+		setContent('ipregion-ai-transport-' + id, row.transport_label || row.transport || _('N/A'));
 		setContent('ipregion-ai-http-' + id, String(row.http_code || 0));
 		setContent('ipregion-ai-status-' + id, [ aiBadge(row) ]);
 		setContent('ipregion-ai-time-' + id, row.latency_ms != null ? row.latency_ms + ' ms' : _('N/A'));
@@ -313,7 +322,7 @@ function updateAiRows(rows) {
 	});
 
 	if (!rows.length && !document.getElementById('ipregion-ai-empty'))
-		table.appendChild(E('tr', { 'class': 'tr ipregion-ai-empty-row', 'id': 'ipregion-ai-empty' }, [ E('td', { 'class': 'td', 'colspan': 6 }, [ _('No results yet') ]) ]));
+		table.appendChild(E('tr', { 'class': 'tr ipregion-ai-empty-row', 'id': 'ipregion-ai-empty' }, [ E('td', { 'class': 'td', 'colspan': 7 }, [ _('No results yet') ]) ]));
 }
 
 function renderOptions(config, interfaces) {
@@ -368,7 +377,7 @@ function renderAiOptions(providers) {
 		].concat(providers.map(function(provider) {
 			return E('option', { 'value': provider.id }, [ provider.name || provider.id ]);
 		}))) ]),
-		E('p', { 'class': 'ipregion-muted ipregion-group-help' }, [ _('AI provider checks use the same IP mode, interface, proxy and timeout controls above.') ]),
+		E('p', { 'class': 'ipregion-muted ipregion-group-help' }, [ _('AI provider checks use the same IP mode, interface, proxy and timeout controls above. IPv4 and IPv6 mode checks both transports separately.') ]),
 		E('p', { 'class': 'ipregion-muted ipregion-group-help' }, [ _('Safe mode is used by default. It does not store API keys and only checks whether provider endpoint domains are reachable through their selected routes.') ])
 	]);
 }
@@ -389,7 +398,8 @@ function renderAiEgress(result) {
 	return E('div', { 'class': 'ipregion-card' }, [
 		E('h3', {}, [ _('Generic egress check') ]),
 		E('p', { 'class': 'ipregion-muted' }, [ _('This is a generic IP/ASN check for the selected route. In domain-based split routing, individual AI provider endpoints may use a different VPN route; check the provider rows above.') ]),
-		E('p', { 'id': 'ipregion-ai-egress-ip' }, [ _('IP'), ': ', egress.ip_masked || egress.ip || _('N/A') ]),
+		E('p', { 'id': 'ipregion-ai-egress-ipv4' }, [ _('IPv4'), ': ', egress.ipv4_masked || _('N/A') ]),
+		E('p', { 'id': 'ipregion-ai-egress-ipv6' }, [ _('IPv6'), ': ', egress.ipv6_masked || _('N/A') ]),
 		E('p', { 'id': 'ipregion-ai-egress-country' }, [ _('Country'), ': ', egress.country || _('N/A') ]),
 		E('p', { 'id': 'ipregion-ai-egress-asn' }, [ _('ASN'), ': ', egress.asn ? egress.asn + ' ' + (egress.asn_name || '') : _('N/A') ])
 	]);
@@ -405,7 +415,8 @@ function updateNetwork(result) {
 
 function updateAiEgress(result) {
 	var egress = result.egress || {};
-	setContent('ipregion-ai-egress-ip', [ _('IP'), ': ', egress.ip_masked || egress.ip || _('N/A') ]);
+	setContent('ipregion-ai-egress-ipv4', [ _('IPv4'), ': ', egress.ipv4_masked || _('N/A') ]);
+	setContent('ipregion-ai-egress-ipv6', [ _('IPv6'), ': ', egress.ipv6_masked || _('N/A') ]);
 	setContent('ipregion-ai-egress-country', [ _('Country'), ': ', egress.country || _('N/A') ]);
 	setContent('ipregion-ai-egress-asn', [ _('ASN'), ': ', egress.asn ? egress.asn + ' ' + (egress.asn_name || '') : _('N/A') ]);
 }
@@ -414,6 +425,8 @@ function versionMessage(version) {
 	var status = version && version.status;
 	if (status === 'latest') return _('Latest version installed');
 	if (status === 'update_available') return _('Update available');
+	if (status === 'latest_is_older') return _('Installed version is newer than the latest GitHub release');
+	if (status === 'version_mismatch') return _('Installed and GitHub versions differ');
 	if (status === 'installed_not_found') return _('Installed version not found');
 	return _('GitHub version not found');
 }
@@ -432,6 +445,7 @@ function renderVersion(version) {
 		E('p', {}, [ _('Latest GitHub version'), ': ', version.release_url ? E('a', { 'href': version.release_url, 'target': '_blank', 'rel': 'noreferrer noopener' }, [ latest ]) : latest ]),
 		E('p', {}, [ _('GitHub repository'), ': ', E('a', { 'href': repoUrl, 'target': '_blank', 'rel': 'noreferrer noopener' }, [ repo ]) ]),
 		E('p', {}, [ versionMessage(version) ]),
+		E('p', { 'class': 'ipregion-muted' }, [ _('Update package installs APKs from GitHub Releases using the repository installer.') ]),
 		update.running ? E('p', {}, [ _('Update is running') ]) : '',
 		E('button', { 'class': 'btn cbi-button cbi-button-apply', 'disabled': canUpdate ? null : 'disabled', 'click': ui.createHandlerFn(this, function() {
 			return callUpdate().then(function(res) {
@@ -606,8 +620,9 @@ return view.extend({
 				E('button', { 'class': 'btn cbi-button', 'click': function() { callResult().then(function(res) { downloadJson(res, 'ipregion-result.json'); }); } }, [ _('Download JSON') ]),
 				E('button', { 'class': 'btn cbi-button', 'click': ui.createHandlerFn(this, function() { return callLog().then(function(res) { ui.showModal(_('Runtime log'), [ E('pre', {}, [ res.log || _('Log is empty') ]), E('div', { 'class': 'right' }, [ E('button', { 'class': 'btn cbi-button', 'click': ui.hideModal }, [ _('Close') ]) ]) ]); }); }) }, [ _('Show log') ]),
 				E('button', { 'class': 'btn cbi-button', 'click': ui.createHandlerFn(this, function() { return callSelftest().then(function(res) { ui.showModal(_('Self-test'), [ E('pre', {}, [ JSON.stringify(res, null, 2) ]), E('div', { 'class': 'right' }, [ E('button', { 'class': 'btn cbi-button', 'click': ui.hideModal }, [ _('Close') ]) ]) ]); }); }) }, [ _('Self-test') ]),
-				E('button', { 'class': 'btn cbi-button cbi-button-reset', 'click': ui.createHandlerFn(this, function() { resetResultUi(); return callClear().then(pollRegionOnce); }) }, [ _('Clear cache') ])
+				E('button', { 'class': 'btn cbi-button cbi-button-reset', 'click': ui.createHandlerFn(this, function() { resetResultUi(); return callClear().then(pollRegionOnce); }) }, [ _('Clear results') ])
 			]),
+			E('p', { 'class': 'ipregion-muted' }, [ _('Download JSON includes raw IP addresses.') ]),
 			E('div', { 'class': 'ipregion-card' }, [
 				E('h3', {}, [ _('Runtime state') ]),
 				E('p', { 'id': 'ipregion-state-running' }, [ state.running ? _('Running') : _('Idle') ]),
@@ -651,8 +666,9 @@ return view.extend({
 				E('button', { 'class': 'btn cbi-button', 'click': pollAiOnce }, [ _('Refresh result') ]),
 				E('button', { 'class': 'btn cbi-button', 'click': function() { callAiResult().then(function(res) { downloadJson(res, 'ipregion-ai-result.json'); }); } }, [ _('Download JSON') ]),
 				E('button', { 'class': 'btn cbi-button', 'click': ui.createHandlerFn(this, function() { return callAiLog().then(function(res) { ui.showModal(_('Runtime log'), [ E('pre', {}, [ res.log || _('Log is empty') ]), E('div', { 'class': 'right' }, [ E('button', { 'class': 'btn cbi-button', 'click': ui.hideModal }, [ _('Close') ]) ]) ]); }); }) }, [ _('Show log') ]),
-				E('button', { 'class': 'btn cbi-button cbi-button-reset', 'click': ui.createHandlerFn(this, function() { resetAiUi(); return callAiClear().then(pollAiOnce); }) }, [ _('Clear cache') ])
+				E('button', { 'class': 'btn cbi-button cbi-button-reset', 'click': ui.createHandlerFn(this, function() { resetAiUi(); return callAiClear().then(pollAiOnce); }) }, [ _('Clear results') ])
 			]),
+			E('p', { 'class': 'ipregion-muted' }, [ _('Download JSON includes raw IP addresses.') ]),
 			E('div', { 'class': 'ipregion-card' }, [
 				E('h3', {}, [ _('Runtime state') ]),
 				E('p', { 'id': 'ipregion-ai-state-running' }, [ aiState.running ? _('Running') : _('Idle') ]),

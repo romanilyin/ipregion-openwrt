@@ -363,3 +363,27 @@ msgstr "Обновление запущено"
 
 msgid "Where to see results"
 msgstr "Где смотреть результаты"
+
+msgid "AI provider checks use the same IP mode, interface, proxy and timeout controls above. IPv4 and IPv6 mode checks both transports separately."
+msgstr "AI-проверки используют выбранные выше режим IP, интерфейс, прокси и таймаут. Режим IPv4 и IPv6 проверяет оба транспорта отдельно."
+
+msgid "Clear results"
+msgstr "Очистить результаты"
+
+msgid "Download JSON includes raw IP addresses."
+msgstr "Скачанный JSON содержит исходные IP-адреса."
+
+msgid "Installed and GitHub versions differ"
+msgstr "Установленная версия отличается от версии на GitHub"
+
+msgid "Installed version is newer than the latest GitHub release"
+msgstr "Установленная версия новее последнего GitHub release"
+
+msgid "Transport"
+msgstr "Транспорт"
+
+msgid "Update package installs APKs from GitHub Releases using the repository installer."
+msgstr "Обновление пакета устанавливает APK из GitHub Releases через installer репозитория."
+
+msgid "When IPv4 and IPv6 mode is selected, each provider gets separate IPv4 and IPv6 rows; unavailable transports are shown explicitly."
+msgstr "В режиме IPv4 и IPv6 каждый провайдер получает отдельные строки IPv4 и IPv6; недоступные транспорты показываются явно."

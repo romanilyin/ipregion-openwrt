@@ -45,14 +45,14 @@ The installer downloads `ipregion*.apk`, `luci-app-ipregion*.apk` and `luci-i18n
 
 Options:
 
-- `IPREGION_RELEASE=2026.5.26-2`: install a specific GitHub release tag instead of `latest`.
+- `IPREGION_RELEASE=2026.5.26-3`: install a specific GitHub release tag instead of `latest`.
 - `IPREGION_INSTALL_LUCI=0`: install only the CLI/backend package.
 - `IPREGION_APK_UPDATE=0`: skip `apk update` before installation.
 
 Pinned release example:
 
 ```sh
-wget -qO- https://raw.githubusercontent.com/romanilyin/ipregion-openwrt/main/install.sh | IPREGION_RELEASE=2026.5.26-2 sh
+wget -qO- https://raw.githubusercontent.com/romanilyin/ipregion-openwrt/main/install.sh | IPREGION_RELEASE=2026.5.26-3 sh
 ```
 
 Manual install from downloaded APK files:
@@ -68,8 +68,10 @@ Open `Status -> IP Region` in LuCI.
 - Run GeoIP, popular service, CDN and AI endpoint checks from one page.
 - Choose IP mode, interface, SOCKS5 proxy, timeout and GeoIP mode.
 - Set a reference country to highlight matching country values in orange and different country values in blue.
+- AI checks show separate IPv4 and IPv6 provider rows when `IPv4 and IPv6` mode is selected; unavailable transports are shown explicitly.
 - View progress while checks run.
-- Download JSON results.
+- Download JSON results. JSON downloads include raw IP addresses.
+- Update the package from GitHub Releases through the version card; downgrade protection prevents installing an older latest release.
 - Open `Services -> IP Region` for default UCI settings.
 
 ## CLI Examples
@@ -97,6 +99,7 @@ ipregion ai --provider google_gemini --json
 - `--geoip-mode lookup`: discover the router egress IP first, then ask GeoIP APIs to look up that IP.
 - `--geoip-mode route`: ask supported GeoIP APIs what country they see for the request itself.
 - `ipregion ai --json`: run safe AI provider endpoint probes without storing or requesting API keys.
+- `ipregion ai --ip-mode both --json`: run each selected AI provider through separate IPv4 and IPv6 probes.
 
 For SOCKS5 proxy checks:
 

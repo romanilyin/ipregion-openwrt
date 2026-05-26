@@ -5,7 +5,7 @@
 import * as fs from 'fs';
 import { cursor } from 'uci';
 
-const VERSION = '2026.5.26-2';
+const VERSION = '2026.5.26-3';
 const CATALOG_PATH = getenv('IPREGION_CATALOG_PATH') || '/usr/share/ipregion/services.json';
 const AI_CATALOG_PATH = getenv('IPREGION_AI_CATALOG_PATH') || '/usr/share/ipregion/services-ai.json';
 const RUNTIME_DIR = getenv('IPREGION_RUNTIME_DIR') || '/tmp/run/ipregion';
@@ -37,7 +37,8 @@ const AI_STATUS_LABELS = {
 	timeout: 'Timeout',
 	network_failed: 'Network failed',
 	server_error: 'Server error',
-	skipped: 'Skipped'
+	skipped: 'Skipped',
+	unavailable: 'Unavailable'
 };
 
 const VALID_GROUPS = [ 'all', 'primary', 'custom', 'cdn' ];
@@ -76,9 +77,9 @@ function usage() {
 		'  -p, --proxy HOST:PORT      Use SOCKS5 proxy\n' +
 		'      --proxy-dns MODE       remote => socks5h, local => socks5\n' +
 		'  -i, --interface IFNAME     Use a validated network interface\n' +
-		'      --config FILE          UCI config path, default /etc/config/ipregion\n' +
+		'      --config FILE          UCI config path; only the default path is loaded\n' +
 		'      --output FILE          Write JSON result to FILE\n' +
-		'      --lock FILE            Reserved runtime lock path\n' +
+		'      --lock FILE            Accepted for future locking; not enforced yet\n' +
 		'      --list-services        List service catalog\n' +
 		'      --list-ai-providers    List AI provider catalog\n' +
 		'      --service SERVICE_ID   Run only selected service, repeatable\n' +
@@ -794,12 +795,26 @@ function merge_object(base, updates) {
 	return base;
 }
 
+function atomic_write(path, payload) {
+	let suffix = '' + time();
+	let now = clock(true);
+
+	if (type(now) == 'array')
+		suffix = '' + now[0] + '.' + now[1];
+
+	let tmp = path + '.tmp.' + suffix;
+	if (fs.writefile(tmp, payload) == null)
+		return null;
+
+	return fs.rename(tmp, path);
+}
+
 function write_partial_output(opts, value) {
 	if (opts.output == null)
 		return;
 
 	fs.mkdir(RUNTIME_DIR);
-	fs.writefile(opts.output, sprintf('%J\n', value));
+	atomic_write(opts.output, sprintf('%J\n', value));
 }
 
 function result_status(status, value, latency_ms, http_code, error) {
@@ -1157,6 +1172,8 @@ function ai_diagnosis(status, auth_check) {
 		return 'Endpoint reached, but provider returned a server error.';
 	case 'skipped':
 		return 'Provider was skipped.';
+	case 'unavailable':
+		return 'Requested IP transport is unavailable on this route.';
 	default:
 		return 'Request failed through this route.';
 	}
@@ -1192,23 +1209,37 @@ function classify_ai_provider(provider, response, auth_check) {
 	return code > 0 ? 'reachable' : 'network_failed';
 }
 
-function skipped_ai_provider(provider, reason) {
+function ai_transport_label(ip_version) {
+	return ip_version == 6 ? 'IPv6' : 'IPv4';
+}
+
+function skipped_ai_provider(provider, reason, ip_version, status) {
+	status = status || 'skipped';
+
 	return {
 		id: provider.id,
 		name: provider.name || provider.id,
+		row_id: provider.id + '-' + ai_transport_label(ip_version),
+		ip_version: ip_version,
+		transport: ai_transport_label(ip_version),
+		transport_label: ai_transport_label(ip_version),
 		category: provider.category || 'ai',
 		category_label: ai_category_label(provider.category || 'ai'),
 		kind: provider.kind || 'api',
 		url: provider.url,
-		status: 'skipped',
-		label: AI_STATUS_LABELS.skipped,
+		status: status,
+		label: AI_STATUS_LABELS[status] || status,
 		http_code: 0,
 		remote_ip: null,
 		request_id: null,
 		latency_ms: null,
 		timing: { connect_ms: null, tls_ms: null, total_ms: null },
-		diagnosis: reason || ai_diagnosis('skipped', false)
+		diagnosis: reason || ai_diagnosis(status, false)
 	};
+}
+
+function unavailable_ai_provider(provider, ip_version) {
+	return skipped_ai_provider(provider, ai_transport_label(ip_version) + ' egress is unavailable on this route.', ip_version, 'unavailable');
 }
 
 function probe_ai_provider(provider, opts, ip_version) {
@@ -1220,7 +1251,7 @@ function probe_ai_provider(provider, opts, ip_version) {
 		let key = auth.env ? getenv(auth.env) : null;
 
 		if (auth.optional == true && (key == null || key == ''))
-			return skipped_ai_provider(provider, 'Environment variable ' + (auth.env || 'API_KEY') + ' is not set.');
+			return skipped_ai_provider(provider, 'Environment variable ' + (auth.env || 'API_KEY') + ' is not set.', ip_version);
 
 		if (auth.type == 'bearer')
 			headers.Authorization = 'Bearer ' + key;
@@ -1237,6 +1268,10 @@ function probe_ai_provider(provider, opts, ip_version) {
 	return {
 		id: provider.id,
 		name: provider.name || provider.id,
+		row_id: provider.id + '-' + ai_transport_label(ip_version),
+		ip_version: ip_version,
+		transport: ai_transport_label(ip_version),
+		transport_label: ai_transport_label(ip_version),
 		category: provider.category || 'ai',
 		category_label: ai_category_label(provider.category || 'ai'),
 		kind: provider.kind || 'api',
@@ -1287,6 +1322,19 @@ function choose_ai_transport(opts, egress) {
 	return 4;
 }
 
+function ai_transport_versions(opts, egress) {
+	if (opts.ip_mode == 'ipv6')
+		return [ 6 ];
+
+	if (opts.ip_mode == 'ipv4')
+		return [ 4 ];
+
+	if (opts.ip_mode == 'both')
+		return [ 4, 6 ];
+
+	return [ choose_ai_transport(opts, egress) ];
+}
+
 function discover_ai_egress(opts) {
 	let egress = {
 		ipv4: null,
@@ -1299,7 +1347,8 @@ function discover_ai_egress(opts) {
 		asn: null,
 		asn_name: null,
 		source: 'maxmind.com',
-		transport_ip_version: null
+		transport_ip_version: null,
+		transport_ip_versions: []
 	};
 
 	let versions = active_versions(opts);
@@ -1315,11 +1364,13 @@ function discover_ai_egress(opts) {
 		}
 	}
 
-	egress.transport_ip_version = choose_ai_transport(opts, egress);
-	egress.ip = egress.transport_ip_version == 6 ? egress.ipv6 : egress.ipv4;
-	egress.ip_masked = egress.transport_ip_version == 6 ? egress.ipv6_masked : egress.ipv4_masked;
+	egress.transport_ip_versions = ai_transport_versions(opts, egress);
+	egress.transport_ip_version = length(egress.transport_ip_versions) == 1 ? egress.transport_ip_versions[0] : null;
+	let display_version = egress.transport_ip_version || (egress.ipv4 != null ? 4 : 6);
+	egress.ip = display_version == 6 ? egress.ipv6 : egress.ipv4;
+	egress.ip_masked = display_version == 6 ? egress.ipv6_masked : egress.ipv4_masked;
 
-	let response = curl_request('GET', 'https://geoip.maxmind.com/geoip/v2.1/city/me', opts, egress.transport_ip_version, { headers: { 'Referer': 'https://www.maxmind.com' }, user_agent: USER_AGENT });
+	let response = curl_request('GET', 'https://geoip.maxmind.com/geoip/v2.1/city/me', opts, display_version, { headers: { 'Referer': 'https://www.maxmind.com' }, user_agent: USER_AGENT });
 	let parsed = parse_json_safe(response.body || '');
 	if (parsed != null) {
 		let country = get_path(parsed, [ 'country', 'iso_code' ]);
@@ -1591,12 +1642,12 @@ function probe_one(id, service, catalog, opts, ip_version) {
 
 function update_state(state) {
 	fs.mkdir(RUNTIME_DIR);
-	fs.writefile(STATE_FILE, sprintf('%J\n', merge_object(read_json_file(STATE_FILE, {}), state)));
+	atomic_write(STATE_FILE, sprintf('%J\n', merge_object(read_json_file(STATE_FILE, {}), state)));
 }
 
 function update_ai_state(state) {
 	fs.mkdir(RUNTIME_DIR);
-	fs.writefile(AI_STATE_FILE, sprintf('%J\n', merge_object(read_json_file(AI_STATE_FILE, {}), state)));
+	atomic_write(AI_STATE_FILE, sprintf('%J\n', merge_object(read_json_file(AI_STATE_FILE, {}), state)));
 }
 
 function build_ai_result(opts, catalog) {
@@ -1632,6 +1683,13 @@ function build_ai_result(opts, catalog) {
 	write_partial_output(opts, result);
 
 	result.egress = discover_ai_egress(opts);
+	let transport_versions = result.egress.transport_ip_versions || [ result.egress.transport_ip_version || 4 ];
+	if (contains(transport_versions, 4) && result.egress.ipv4 == null)
+		push(result.errors, { code: 'ipv4_unavailable', message: 'External IPv4 address could not be discovered for AI checks' });
+
+	if (contains(transport_versions, 6) && result.egress.ipv6 == null)
+		push(result.errors, { code: 'ipv6_unavailable', message: 'External IPv6 address could not be discovered for AI checks' });
+
 	if (result.egress.ip == null)
 		push(result.errors, { code: 'egress_unavailable', message: 'External IP address could not be discovered for AI transport route' });
 	write_partial_output(opts, result);
@@ -1640,17 +1698,25 @@ function build_ai_result(opts, catalog) {
 	if (length(providers) == 0)
 		push(result.errors, { code: 'no_ai_providers', message: 'No AI providers matched the requested filters' });
 
+	let total_checks = length(providers) * length(transport_versions);
 	for (let provider in providers) {
-		update_ai_state({ running: true, current: provider.name || provider.id, current_id: provider.id, finished: length(result.providers), total: length(providers) });
-		push(result.providers, probe_ai_provider(provider, opts, result.egress.transport_ip_version || 4));
-		write_partial_output(opts, result);
+		for (let ip_version in transport_versions) {
+			update_ai_state({ running: true, current: (provider.name || provider.id) + ' / ' + ai_transport_label(ip_version), current_id: provider.id + '-' + ai_transport_label(ip_version), finished: length(result.providers), total: total_checks });
+
+			if ((ip_version == 4 && result.egress.ipv4 == null) || (ip_version == 6 && result.egress.ipv6 == null))
+				push(result.providers, unavailable_ai_provider(provider, ip_version));
+			else
+				push(result.providers, probe_ai_provider(provider, opts, ip_version));
+
+			write_partial_output(opts, result);
+		}
 	}
 
 	let end = clock(true);
 	if (type(start) == 'array' && type(end) == 'array')
 		result.duration_ms = ((end[0] - start[0]) * 1000) + int((end[1] - start[1]) / 1000000);
 
-	update_ai_state({ running: false, current: null, current_id: null, finished: length(result.providers), total: length(providers), exit_code: length(result.errors) ? 1 : 0, started_at: result.generated_at, finished_at: now_iso(), duration_ms: result.duration_ms, result_file: opts.output });
+	update_ai_state({ running: false, current: null, current_id: null, finished: length(result.providers), total: total_checks, exit_code: length(result.errors) ? 1 : 0, started_at: result.generated_at, finished_at: now_iso(), duration_ms: result.duration_ms, result_file: opts.output });
 
 	return result;
 }
@@ -1803,7 +1869,7 @@ function write_json_output(opts, value, emit_stdout) {
 
 	if (opts.output != null) {
 		fs.mkdir(RUNTIME_DIR);
-		if (fs.writefile(opts.output, payload) == null)
+		if (atomic_write(opts.output, payload) == null)
 			die('failed to write output: ' + opts.output, 1);
 	}
 
@@ -1902,7 +1968,7 @@ function print_plain_ai_result(result) {
 
 	printf('\nAI providers\n');
 	for (let provider in result.providers)
-		printf('  %s\tHTTP=%s\t%s\t%s\n', provider.name, provider.http_code || 0, provider.label, provider.diagnosis || '');
+		printf('  %s\t%s\tHTTP=%s\t%s\t%s\n', provider.name, provider.transport_label || provider.transport || 'IPv4', provider.http_code || 0, provider.label, provider.diagnosis || '');
 
 	if (length(result.errors) > 0) {
 		printf('\nErrors:\n');

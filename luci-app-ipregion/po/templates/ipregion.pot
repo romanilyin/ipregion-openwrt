@@ -362,3 +362,27 @@ msgstr ""
 
 msgid "Where to see results"
 msgstr ""
+
+msgid "AI provider checks use the same IP mode, interface, proxy and timeout controls above. IPv4 and IPv6 mode checks both transports separately."
+msgstr ""
+
+msgid "Clear results"
+msgstr ""
+
+msgid "Download JSON includes raw IP addresses."
+msgstr ""
+
+msgid "Installed and GitHub versions differ"
+msgstr ""
+
+msgid "Installed version is newer than the latest GitHub release"
+msgstr ""
+
+msgid "Transport"
+msgstr ""
+
+msgid "Update package installs APKs from GitHub Releases using the repository installer."
+msgstr ""
+
+msgid "When IPv4 and IPv6 mode is selected, each provider gets separate IPv4 and IPv6 rows; unavailable transports are shown explicitly."
+msgstr ""
