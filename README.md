@@ -6,7 +6,9 @@
 
 [![CI](https://github.com/romanilyin/ipregion-openwrt/actions/workflows/ci.yml/badge.svg)](https://github.com/romanilyin/ipregion-openwrt/actions/workflows/ci.yml)
 
-IPRegion is an OpenWrt 25.12.1+ CLI and LuCI app for checking how GeoIP APIs, popular services, CDN endpoints and AI providers see your router route, interface or SOCKS5 proxy.
+IPRegion is an OpenWrt CLI and LuCI app for checking how GeoIP APIs, popular services, CDN endpoints and AI providers see your router route, interface or SOCKS5 proxy.
+
+Validated runtime target: OpenWrt 25.12.1+. OpenWrt 24.10.* preparation is experimental on the 24.10 branch and must be verified on real hardware before a public release.
 
 ## Documentation
 
@@ -31,7 +33,7 @@ Packages:
 - `luci-app-ipregion`: LuCI UI under `Status -> IP Region`.
 - `luci-i18n-ipregion-ru`: Russian LuCI translation.
 
-The release APK packages are `noarch`, so the same assets are intended for supported OpenWrt 25.12.1+ targets across CPU architectures.
+The release APK packages are `noarch`, so the same assets are intended for supported OpenWrt targets across CPU architectures. Public releases remain validated for OpenWrt 25.12.1+ until 24.10 router smoke testing passes.
 
 ## Install
 

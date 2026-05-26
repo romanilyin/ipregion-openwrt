@@ -4,7 +4,8 @@ This document collects the technical details that are useful for maintainers, co
 
 ## Scope
 
-- Target OpenWrt version: `25.12.1+`.
+- Validated OpenWrt target: `25.12.1+`.
+- OpenWrt `24.10.*` preparation is experimental and must not be released publicly until real router smoke testing passes.
 - Runtime package manager examples use `apk`.
 - `ipregion` is a `ucode` CLI/backend package.
 - `luci-app-ipregion` is a LuCI app backed by a narrow rpcd/ubus API.
@@ -57,6 +58,16 @@ scripts/build-sdk-packages.sh ath79/generic
 ```
 
 The packages are noarch, but testing several SDK targets catches feed, dependency and package metadata issues.
+
+Experimental 24.10 SDK smoke before router hardware is available:
+
+```sh
+OPENWRT_VERSION=24.10.6 scripts/build-sdk-packages.sh mediatek/filogic
+```
+
+This only checks package build compatibility. Do not publish 24.10 support until install, CLI, rpcd and LuCI are verified on a real 24.10 router.
+
+The official 24.10.6 SDK currently emits IPK package files for this smoke build. Runtime installation and public release assets still use APK only; 24.10 runtime support requires an apk-capable router image.
 
 If a local throwaway host lacks OpenWrt SDK prerequisites, `IPREGION_SKIP_PREREQ=1` can bypass SDK prerequisite probing. Do not use that as proof for official package readiness; install the missing SDK host dependencies for real verification.
 

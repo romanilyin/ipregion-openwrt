@@ -5,7 +5,12 @@ set -eu
 ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 
 : "${OPENWRT_VERSION:=25.12.4}"
-: "${OPENWRT_GCC_VERSION:=14.3.0}"
+if [ -z "${OPENWRT_GCC_VERSION+x}" ]; then
+	case "$OPENWRT_VERSION" in
+		24.10.*) OPENWRT_GCC_VERSION=13.3.0 ;;
+		*) OPENWRT_GCC_VERSION=14.3.0 ;;
+	esac
+fi
 : "${OPENWRT_DOWNLOAD_BASE:=https://downloads.openwrt.org/releases}"
 : "${OPENWRT_SDK_WORKDIR:=/tmp/opencode/openwrt-sdk-builds}"
 : "${IPREGION_FEEDS_UPDATE:=1}"
@@ -101,3 +106,4 @@ make package/luci-app-ipregion/compile V=s
 
 printf 'Built packages for %s:\n' "$target"
 ls -1 bin/packages/*/base/*ipregion*.apk 2>/dev/null || true
+ls -1 bin/packages/*/base/*ipregion*.ipk 2>/dev/null || true
