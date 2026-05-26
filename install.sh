@@ -8,8 +8,15 @@ INSTALL_LUCI=${IPREGION_INSTALL_LUCI:-1}
 APK_UPDATE=${IPREGION_APK_UPDATE:-1}
 APK_FLAGS=${IPREGION_APK_FLAGS:---allow-untrusted}
 GITHUB_API=${IPREGION_GITHUB_API:-https://api.github.com}
+GITHUB_DOWNLOAD_BASE=${IPREGION_GITHUB_DOWNLOAD_BASE:-https://github.com}
+DOWNLOAD_RETRIES=${IPREGION_DOWNLOAD_RETRIES:-3}
+DOWNLOAD_RETRY_DELAY=${IPREGION_DOWNLOAD_RETRY_DELAY:-2}
 TMP_DIR=${TMPDIR:-/tmp}/ipregion-install.$$
 RELEASE_JSON=$TMP_DIR/release.json
+DOWNLOAD_ERR=$TMP_DIR/download.err
+
+GITHUB_API=${GITHUB_API%/}
+GITHUB_DOWNLOAD_BASE=${GITHUB_DOWNLOAD_BASE%/}
 
 log() {
 	printf '%s\n' "ipregion-install: $*"
@@ -76,6 +83,16 @@ check_target() {
 }
 
 validate_inputs() {
+	case "$DOWNLOAD_RETRIES" in
+		''|*[!0-9]*) DOWNLOAD_RETRIES=3 ;;
+	esac
+
+	case "$DOWNLOAD_RETRY_DELAY" in
+		''|*[!0-9]*) DOWNLOAD_RETRY_DELAY=2 ;;
+	esac
+
+	[ "$DOWNLOAD_RETRIES" -ge 1 ] || DOWNLOAD_RETRIES=1
+
 	case "$REPO" in
 		*/*) ;;
 		*) die "IPREGION_REPO must look like owner/repo" ;;
@@ -87,6 +104,16 @@ validate_inputs() {
 
 	case "$RELEASE" in
 		*[!A-Za-z0-9._-]*) die "IPREGION_RELEASE contains unsupported characters" ;;
+	esac
+
+	case "$GITHUB_API" in
+		http://*|https://*) ;;
+		*) die "IPREGION_GITHUB_API must start with http:// or https://" ;;
+	esac
+
+	case "$GITHUB_DOWNLOAD_BASE" in
+		http://*|https://*) ;;
+		*) die "IPREGION_GITHUB_DOWNLOAD_BASE must start with http:// or https://" ;;
 	esac
 }
 
@@ -100,15 +127,53 @@ select_downloader() {
 	fi
 }
 
+download_once() {
+	url=$1
+	out=$2
+	rm -f "$DOWNLOAD_ERR"
+
+	case "$DOWNLOADER" in
+		wget) wget -q -O "$out" "$url" 2>"$DOWNLOAD_ERR" ;;
+		uclient-fetch) uclient-fetch -q -O "$out" "$url" 2>"$DOWNLOAD_ERR" ;;
+		*) die "internal downloader error" ;;
+	esac
+}
+
+download_error() {
+	sed -n '1p' "$DOWNLOAD_ERR" 2>/dev/null || true
+}
+
 download() {
 	url=$1
 	out=$2
+	label=$3
+	attempt=1
 
-	case "$DOWNLOADER" in
-		wget) wget -q -O "$out" "$url" ;;
-		uclient-fetch) uclient-fetch -q -O "$out" "$url" ;;
-		*) die "internal downloader error" ;;
-	esac
+	rm -f "$out"
+	while [ "$attempt" -le "$DOWNLOAD_RETRIES" ]; do
+		if [ "$DOWNLOAD_RETRIES" -gt 1 ]; then
+			log "downloading $label (attempt $attempt/$DOWNLOAD_RETRIES)"
+		fi
+
+		if download_once "$url" "$out"; then
+			return 0
+		fi
+
+		err=$(download_error)
+		if [ -n "$err" ]; then
+			log "download failed for $label: $err"
+		else
+			log "download failed for $label"
+		fi
+
+		rm -f "$out"
+		if [ "$attempt" -lt "$DOWNLOAD_RETRIES" ] && [ "$DOWNLOAD_RETRY_DELAY" -gt 0 ]; then
+			sleep "$DOWNLOAD_RETRY_DELAY"
+		fi
+		attempt=$((attempt + 1))
+	done
+
+	return 1
 }
 
 release_api_url() {
@@ -117,6 +182,36 @@ release_api_url() {
 	else
 		printf '%s/repos/%s/releases/tags/%s\n' "$GITHUB_API" "$REPO" "$RELEASE"
 	fi
+}
+
+direct_release_asset_url() {
+	pkg=$1
+
+	if [ "$RELEASE" = latest ]; then
+		printf '%s/%s/releases/latest/download/%s.apk\n' "$GITHUB_DOWNLOAD_BASE" "$REPO" "$pkg"
+	else
+		printf '%s/%s/releases/download/%s/%s.apk\n' "$GITHUB_DOWNLOAD_BASE" "$REPO" "$RELEASE" "$pkg"
+	fi
+}
+
+metadata_has_assets() {
+	awk '/"browser_download_url"[[:space:]]*:/ { found = 1 } END { exit found ? 0 : 1 }' "$RELEASE_JSON"
+}
+
+metadata_error_message() {
+	awk '
+		match($0, /"message"[[:space:]]*:[[:space:]]*"[^"]*"/) {
+			msg = substr($0, RSTART, RLENGTH)
+			sub(/^"message"[[:space:]]*:[[:space:]]*"/, "", msg)
+			sub(/"$/, "", msg)
+			print msg
+			exit
+		}
+	' "$RELEASE_JSON"
+}
+
+remove_downloaded_packages() {
+	rm -f "$TMP_DIR/ipregion.apk" "$TMP_DIR/luci-app-ipregion.apk" "$TMP_DIR/luci-i18n-ipregion-ru.apk"
 }
 
 asset_url_for() {
@@ -162,18 +257,79 @@ asset_url_for() {
 fetch_release_metadata() {
 	url=$(release_api_url)
 	log "reading release metadata from $url"
-	download "$url" "$RELEASE_JSON" || die "failed to read GitHub release metadata"
+	download "$url" "$RELEASE_JSON" "GitHub release metadata" || return 1
+
+	if ! metadata_has_assets; then
+		message=$(metadata_error_message)
+		if [ -n "$message" ]; then
+			log "GitHub API response: $message"
+		else
+			log "GitHub API response did not contain release assets"
+		fi
+		return 1
+	fi
 }
 
 fetch_package() {
 	pkg=$1
 	out=$TMP_DIR/$pkg.apk
 	url=$(asset_url_for "$pkg")
-	[ -n "$url" ] || die "release asset not found: $pkg*.apk"
+	[ -n "$url" ] || { log "release asset not found in metadata: $pkg*.apk"; return 1; }
 
 	log "downloading $pkg"
-	download "$url" "$out" || die "failed to download $pkg"
-	[ -s "$out" ] || die "downloaded empty package: $pkg"
+	download "$url" "$out" "$pkg" || return 1
+	[ -s "$out" ] || { log "downloaded empty package: $pkg"; return 1; }
+}
+
+fetch_direct_package() {
+	pkg=$1
+	out=$TMP_DIR/$pkg.apk
+	url=$(direct_release_asset_url "$pkg")
+
+	log "downloading $pkg from direct release asset"
+	download "$url" "$out" "$pkg direct release asset" || return 1
+	[ -s "$out" ] || { log "downloaded empty package: $pkg"; return 1; }
+}
+
+fetch_metadata_packages() {
+	fetch_release_metadata || return 1
+	fetch_package ipregion || return 1
+	if is_luci_enabled; then
+		fetch_package luci-app-ipregion || return 1
+		fetch_package luci-i18n-ipregion-ru || return 1
+	fi
+}
+
+fetch_direct_packages() {
+	fetch_direct_package ipregion || return 1
+	if is_luci_enabled; then
+		fetch_direct_package luci-app-ipregion || return 1
+		fetch_direct_package luci-i18n-ipregion-ru || return 1
+	fi
+}
+
+probe_url() {
+	label=$1
+	url=$2
+
+	if download_once "$url" /dev/null; then
+		log "$label reachable"
+	else
+		err=$(download_error)
+		if [ -n "$err" ]; then
+			log "$label not reachable: $err"
+		else
+			log "$label not reachable"
+		fi
+	fi
+}
+
+diagnose_github_access() {
+	log "checking GitHub connectivity from this router"
+	probe_url "GitHub release page" "$GITHUB_DOWNLOAD_BASE/$REPO/releases"
+	probe_url "GitHub API" "$GITHUB_API"
+	probe_url "GitHub raw content" "https://raw.githubusercontent.com/$REPO/main/install.sh"
+	log "if GitHub is blocked or rate-limited, retry later or install downloaded APK files manually"
 }
 
 install_packages() {
@@ -214,11 +370,13 @@ mkdir -p "$TMP_DIR"
 check_target
 validate_inputs
 select_downloader
-fetch_release_metadata
-fetch_package ipregion
-if is_luci_enabled; then
-	fetch_package luci-app-ipregion
-	fetch_package luci-i18n-ipregion-ru
+if ! fetch_metadata_packages; then
+	log "GitHub release metadata path failed; trying direct release asset URLs"
+	remove_downloaded_packages
+	if ! fetch_direct_packages; then
+		diagnose_github_access
+		die "failed to download GitHub release assets"
+	fi
 fi
 install_packages
 post_install
