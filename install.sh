@@ -124,26 +124,32 @@ asset_url_for() {
 	awk -v pkg="$pkg" '
 		function basename(url, name) {
 			name = url
+			sub(/[?#].*$/, "", name)
 			sub(/^.*\//, "", name)
 			return name
 		}
 		function wanted(name) {
 			return name == pkg ".apk" || name ~ ("^" pkg "[-_].*\\.apk$")
 		}
-		/"browser_download_url"/ {
-			gsub(/[",]/, "")
-			for (i = 1; i <= NF; i++) {
-				if ($i ~ /^https:\/\//) {
-					url = $i
-					name = basename(url)
-					if (name == pkg ".apk") {
-						print url
-						found = 1
-						exit
-					}
-					if (fallback == "" && wanted(name))
-						fallback = url
-				}
+		function consider(url, name) {
+			gsub(/\\\//, "/", url)
+			name = basename(url)
+			if (name == pkg ".apk") {
+				print url
+				found = 1
+				exit
+			}
+			if (fallback == "" && wanted(name))
+				fallback = url
+		}
+		{
+			line = $0
+			while (match(line, /"browser_download_url"[[:space:]]*:[[:space:]]*"[^"]*"/)) {
+				url = substr(line, RSTART, RLENGTH)
+				sub(/^"browser_download_url"[[:space:]]*:[[:space:]]*"/, "", url)
+				sub(/"$/, "", url)
+				consider(url)
+				line = substr(line, RSTART + RLENGTH)
 			}
 		}
 		END {
