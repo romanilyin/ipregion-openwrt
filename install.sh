@@ -67,8 +67,8 @@ check_target() {
 		release=$(sed -n "s/^DISTRIB_RELEASE='\([^']*\)'.*/\1/p" /etc/openwrt_release | sed 's/-.*$//' || true)
 		case "$release" in
 			''|SNAPSHOT) ;;
-			*[!0-9.]*) log "warning: could not parse OpenWrt release; expected 25.12.4+" ;;
-			*) version_ge "$release" 25.12.4 || die "OpenWrt $release is unsupported; expected 25.12.4+" ;;
+			*[!0-9.]*) log "warning: could not parse OpenWrt release; expected 25.12.1+" ;;
+			*) version_ge "$release" 25.12.1 || die "OpenWrt $release is unsupported; expected 25.12.1+" ;;
 		esac
 	else
 		log "warning: /etc/openwrt_release not found; continuing because apk is available"

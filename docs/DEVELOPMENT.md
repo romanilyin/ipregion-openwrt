@@ -4,7 +4,7 @@ This document collects the technical details that are useful for maintainers, co
 
 ## Scope
 
-- Target OpenWrt version: `25.12.4+`.
+- Target OpenWrt version: `25.12.1+`.
 - Runtime package manager examples use `apk`.
 - `ipregion` is a `ucode` CLI/backend package.
 - `luci-app-ipregion` is a LuCI app backed by a narrow rpcd/ubus API.
@@ -34,7 +34,7 @@ The CI workflow also runs these checks, but GitHub account billing or spending-l
 
 ## SDK Build Smoke
 
-From an OpenWrt 25.12.4+ buildroot or SDK with this package feed available:
+From an OpenWrt 25.12.1+ buildroot or SDK with this package feed available:
 
 ```sh
 make package/ipregion/compile V=s
