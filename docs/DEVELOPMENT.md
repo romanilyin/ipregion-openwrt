@@ -128,10 +128,10 @@ Endpoint failures must remain per-service and must not abort the whole run.
 
 The public GitHub Release installer is `install.sh` at the repository root.
 
-- It reads GitHub Release metadata.
+- It reads GitHub Release metadata, retries transient failures and falls back to direct stable asset URLs if GitHub API metadata is unavailable.
 - It downloads `ipregion*.apk`, `luci-app-ipregion*.apk` and `luci-i18n-ipregion-ru*.apk`.
 - It installs with `apk` and `--allow-untrusted` by default because GitHub Release APKs are not from the official OpenWrt package repository.
-- It supports `IPREGION_RELEASE`, `IPREGION_INSTALL_LUCI`, `IPREGION_APK_UPDATE`, `IPREGION_REPO`, `IPREGION_GITHUB_API` and `IPREGION_APK_FLAGS`.
+- It supports `IPREGION_RELEASE`, `IPREGION_INSTALL_LUCI`, `IPREGION_APK_UPDATE`, `IPREGION_REPO`, `IPREGION_GITHUB_API`, `IPREGION_GITHUB_DOWNLOAD_BASE`, `IPREGION_DOWNLOAD_RETRIES`, `IPREGION_DOWNLOAD_RETRY_DELAY` and `IPREGION_APK_FLAGS`.
 - The LuCI update button is kept for public GitHub Release builds and is guarded against downgrades when the installed package is newer than the latest GitHub release.
 
 Before publishing a release:
@@ -139,6 +139,7 @@ Before publishing a release:
 - run `scripts/ci/static-checks.sh`
 - run `scripts/ci/ucode-checks.sh` with a local `ucode` build
 - build packages in an OpenWrt SDK
+- upload versioned APK assets and stable aliases named `ipregion.apk`, `luci-app-ipregion.apk` and `luci-i18n-ipregion-ru.apk`
 - run focused router smoke tests
 - verify LuCI after hard refresh and `rpcd` restart
 
