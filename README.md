@@ -74,7 +74,7 @@ make package/luci-app-ipregion/compile V=s
 Runtime installation examples use `apk`:
 
 ```sh
-apk add --allow-untrusted ./ipregion-*.apk ./luci-app-ipregion-*.apk
+apk add --allow-untrusted ./ipregion-*.apk ./luci-app-ipregion-*.apk ./luci-i18n-ipregion-ru-*.apk
 ```
 
 Feed checkout example for SDK/buildroot development:

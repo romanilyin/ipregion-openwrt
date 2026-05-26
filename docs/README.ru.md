@@ -72,7 +72,7 @@ make package/luci-app-ipregion/compile V=s
 Установка готовых пакетов использует `apk`:
 
 ```sh
-apk add --allow-untrusted ./ipregion-*.apk ./luci-app-ipregion-*.apk
+apk add --allow-untrusted ./ipregion-*.apk ./luci-app-ipregion-*.apk ./luci-i18n-ipregion-ru-*.apk
 ```
 
 Пример checkout для разработки в SDK/buildroot:
