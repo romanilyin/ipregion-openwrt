@@ -38,7 +38,7 @@ Implemented:
 - Runtime state, result and logs under `/tmp/run/ipregion/`.
 - GitHub Actions CI for static checks and `ucode` syntax checks.
 
-Verified with the OpenWrt 25.12.4 SDK and a real router smoke test. GitHub Release assets are still required for public one-line install/update.
+Verified with the OpenWrt 25.12.4 SDK and a real router smoke test. Public GitHub Release assets are available for one-line install/update.
 
 ## One-Line Install
 
@@ -48,7 +48,7 @@ On the router:
 wget -qO- https://raw.githubusercontent.com/romanilyin/ipregion-openwrt/main/install.sh | sh
 ```
 
-The installer downloads `ipregion*.apk` and `luci-app-ipregion*.apk` from the latest GitHub Release and installs them with `apk`. It requires published release assets; until the first release exists, use the SDK build flow below.
+The installer downloads `ipregion*.apk`, `luci-app-ipregion*.apk` and `luci-i18n-ipregion-ru*.apk` from the latest GitHub Release and installs them with `apk`.
 
 Options:
 
