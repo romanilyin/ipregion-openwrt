@@ -65,6 +65,7 @@ apk add --allow-untrusted ./ipregion-*.apk ./luci-app-ipregion-*.apk ./luci-i18n
 
 - Запускайте GeoIP, popular service, CDN и AI endpoint проверки с одной страницы.
 - Выбирайте IP mode, interface, SOCKS5 proxy, timeout и GeoIP mode.
+- Задавайте реальную страну, чтобы совпадающие значения подсвечивались оранжевым, а отличающиеся - синим.
 - Смотрите прогресс во время выполнения.
 - Скачивайте JSON результата.
 - Откройте `Services -> IP Region` для UCI-настроек по умолчанию.

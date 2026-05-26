@@ -43,6 +43,9 @@ msgstr "ASN"
 msgid "Auto"
 msgstr "Авто"
 
+msgid "Auto-detect reference country"
+msgstr "Автоопределить реальную страну"
+
 msgid "Cache TTL"
 msgstr "TTL кэша"
 
@@ -87,6 +90,9 @@ msgstr "Настройка параметров диагностики по ум
 
 msgid "Country"
 msgstr "Страна"
+
+msgid "Could not update reference country field."
+msgstr "Не удалось обновить поле реальной страны."
 
 msgid "Current check"
 msgstr "Текущая проверка"
@@ -159,6 +165,9 @@ msgstr "Проверка IP Region запущена"
 
 msgid "IP"
 msgstr "IP"
+
+msgid "ISO 3166-1 alpha-2 country code used to highlight country values. Matching countries are orange; different countries are blue."
+msgstr "Двухбуквенный код страны ISO 3166-1 alpha-2 для подсветки значений стран. Совпадающие страны будут оранжевыми, отличающиеся - синими."
 
 msgid "GitHub version not found"
 msgstr "Версия на GitHub не найдена"
@@ -256,6 +265,15 @@ msgstr "Прокси"
 msgid "Refresh result"
 msgstr "Обновить результат"
 
+msgid "Reference country"
+msgstr "Реальная страна"
+
+msgid "Reference country detected"
+msgstr "Реальная страна определена"
+
+msgid "Reference country must be a two-letter country code, for example RU."
+msgstr "Реальная страна должна быть двухбуквенным кодом, например RU."
+
 msgid "Remote DNS"
 msgstr "Удаленный DNS"
 
@@ -270,6 +288,9 @@ msgstr "Запустить AI-проверку"
 
 msgid "Run checks and inspect results on the Status page."
 msgstr "Запускайте проверки и смотрите результаты на странице статуса."
+
+msgid "Run a GeoIP check before auto-detecting the reference country."
+msgstr "Запустите GeoIP-проверку перед автоопределением реальной страны."
 
 msgid "Running"
 msgstr "Выполняется"
@@ -333,6 +354,9 @@ msgstr "Обновление выполняется"
 
 msgid "Update package"
 msgstr "Обновить пакет"
+
+msgid "Uses the latest successful GeoIP results. Run a check on the Status page first if no country is available."
+msgstr "Использует последние успешные результаты GeoIP. Если страна недоступна, сначала запустите проверку на странице статуса."
 
 msgid "Update started"
 msgstr "Обновление запущено"

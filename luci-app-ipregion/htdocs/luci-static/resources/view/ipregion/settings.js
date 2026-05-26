@@ -1,6 +1,25 @@
 'use strict';
 'require view';
 'require form';
+'require rpc';
+'require ui';
+
+var callDetectedCountry = rpc.declare({ object: 'luci.ipregion', method: 'detected_country', expect: { '': {} } });
+
+function referenceCountryInput(section_id) {
+	return document.getElementById('widget.cbid.ipregion.' + section_id + '.reference_country') ||
+		document.querySelector('[name="cbid.ipregion.' + section_id + '.reference_country"]');
+}
+
+function setReferenceCountry(section_id, value) {
+	var node = referenceCountryInput(section_id);
+	if (!node)
+		return false;
+
+	node.value = String(value || '').toUpperCase();
+	node.dispatchEvent(new Event('change', { bubbles: true }));
+	return true;
+}
 
 return view.extend({
 	render: function() {
@@ -40,6 +59,33 @@ return view.extend({
 		o.value('route', _('Check service-visible route'));
 		o.description = _('GeoIP lookup checks the discovered router IP. Service-visible route asks supported GeoIP APIs what country they see for this exact request path.');
 		o.default = 'lookup';
+
+		o = s.option(form.Value, 'reference_country', _('Reference country'));
+		o.placeholder = 'RU';
+		o.datatype = 'maxlength(2)';
+		o.description = _('ISO 3166-1 alpha-2 country code used to highlight country values. Matching countries are orange; different countries are blue.');
+		o.rmempty = true;
+		o.validate = function(section_id, value) {
+			return !value || /^[A-Za-z]{2}$/.test(value) ? true : _('Reference country must be a two-letter country code, for example RU.');
+		};
+
+		o = s.option(form.Button, '_detect_reference_country', _('Auto-detect reference country'));
+		o.inputstyle = 'apply';
+		o.description = _('Uses the latest successful GeoIP results. Run a check on the Status page first if no country is available.');
+		o.onclick = function(section_id) {
+			return callDetectedCountry().then(function(res) {
+				if (res && res.available && res.country) {
+					if (setReferenceCountry(section_id, res.country))
+						ui.addNotification(null, E('p', {}, [ _('Reference country detected') + ': ' + res.country ]));
+					else
+						ui.addNotification(null, E('p', {}, [ _('Could not update reference country field.') ]), 'error');
+
+					return;
+				}
+
+				ui.addNotification(null, E('p', {}, [ _('Run a GeoIP check before auto-detecting the reference country.') ]), 'warning');
+			});
+		};
 
 		o = s.option(form.Value, 'timeout', _('Timeout'));
 		o.datatype = 'range(1,60)';

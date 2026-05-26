@@ -42,6 +42,9 @@ msgstr ""
 msgid "Auto"
 msgstr ""
 
+msgid "Auto-detect reference country"
+msgstr ""
+
 msgid "Cache TTL"
 msgstr ""
 
@@ -85,6 +88,9 @@ msgid "Configure default diagnostics options."
 msgstr ""
 
 msgid "Country"
+msgstr ""
+
+msgid "Could not update reference country field."
 msgstr ""
 
 msgid "Current check"
@@ -157,6 +163,9 @@ msgid "IP Region check started"
 msgstr ""
 
 msgid "IP"
+msgstr ""
+
+msgid "ISO 3166-1 alpha-2 country code used to highlight country values. Matching countries are orange; different countries are blue."
 msgstr ""
 
 msgid "GitHub version not found"
@@ -255,6 +264,15 @@ msgstr ""
 msgid "Refresh result"
 msgstr ""
 
+msgid "Reference country"
+msgstr ""
+
+msgid "Reference country detected"
+msgstr ""
+
+msgid "Reference country must be a two-letter country code, for example RU."
+msgstr ""
+
 msgid "Remote DNS"
 msgstr ""
 
@@ -268,6 +286,9 @@ msgid "Run AI check"
 msgstr ""
 
 msgid "Run checks and inspect results on the Status page."
+msgstr ""
+
+msgid "Run a GeoIP check before auto-detecting the reference country."
 msgstr ""
 
 msgid "Running"
@@ -331,6 +352,9 @@ msgid "Update is running"
 msgstr ""
 
 msgid "Update package"
+msgstr ""
+
+msgid "Uses the latest successful GeoIP results. Run a check on the Status page first if no country is available."
 msgstr ""
 
 msgid "Update started"

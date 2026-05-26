@@ -57,6 +57,17 @@ function trim_str(value) {
 	return rtrim(ltrim('' + (value ?? '')));
 }
 
+function upper_ascii(value) {
+	let s = '' + (value ?? '');
+	let out = '';
+	for (let i = 0; i < length(s); i++) {
+		let c = substr(s, i, 1);
+		let o = ord(c);
+		out += (o >= 97 && o <= 122) ? chr(o - 32) : c;
+	}
+	return out;
+}
+
 function shell_quote(value) {
 	return "'" + replace('' + (value ?? ''), "'", "'\"'\"'") + "'";
 }
@@ -130,6 +141,7 @@ function current_config() {
 		group: 'all',
 		ip_mode: 'auto',
 		geoip_mode: 'lookup',
+		reference_country: '',
 		timeout: '5',
 		retries: '1',
 		proxy: '',
@@ -156,6 +168,58 @@ function current_config() {
 			cfg[key] = defaults[key];
 
 	return cfg;
+}
+
+function country_from_value(value) {
+	value = upper_ascii(trim_str(value || ''));
+	let m = match(value, /^([A-Z][A-Z])($|[^A-Z])/);
+	return m ? m[1] : null;
+}
+
+function detected_country_from_result() {
+	let result = read_json_file(RESULT_FILE, {});
+	let rows = result.results && result.results.primary || [];
+	let counts = {};
+	let sources = {};
+	let order = [];
+
+	for (let row in rows) {
+		let candidate = null;
+		let source = row.service || row.id || '';
+
+		for (let probe in [ row.ipv4, row.ipv6 ]) {
+			if (probe == null || probe.status != 'ok')
+				continue;
+
+			candidate = country_from_value(probe.value);
+			if (candidate != null)
+				break;
+		}
+
+		if (candidate == null)
+			continue;
+
+		if (counts[candidate] == null) {
+			counts[candidate] = 0;
+			sources[candidate] = source;
+			push(order, candidate);
+		}
+
+		counts[candidate]++;
+	}
+
+	let best = null;
+	for (let country in order)
+		if (best == null || counts[country] > counts[best])
+			best = country;
+
+	return {
+		available: best != null,
+		country: best,
+		count: best != null ? counts[best] : 0,
+		source: best != null ? sources[best] : null,
+		generated_at: result.generated_at || null
+	};
 }
 
 function package_version(pkg) {
@@ -333,6 +397,12 @@ const methods = {
 				push(result, { name: name, label: name });
 
 			return { interfaces: result };
+		}
+	},
+
+	detected_country: {
+		call: function(req) {
+			return detected_country_from_result();
 		}
 	},
 
