@@ -11,7 +11,7 @@ PKG_LICENSE:=MIT
 PKG_MAINTAINER:=Roman Ilyin <https://github.com/romanilyin>
 
 define Build/Prepare/luci-app-ipregion
-	$(FIND) $(PKG_BUILD_DIR) -type f -print0 | $(XARGS) -0 chmod 0644
+	[ ! -d $(PKG_BUILD_DIR) ] || $(FIND) $(PKG_BUILD_DIR) -type f -print0 | $(XARGS) -0 chmod 0644
 endef
 
 include $(TOPDIR)/feeds/luci/luci.mk

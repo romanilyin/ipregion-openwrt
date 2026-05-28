@@ -240,8 +240,28 @@ function detected_country_from_result() {
 }
 
 function package_version(pkg) {
-	let output = read_command([ 'apk', 'list', '--installed', pkg ]);
-	let prefix = pkg + '-';
+	let output;
+	let prefix;
+
+	if (command_exists('apk')) {
+		output = read_command([ 'apk', 'list', '--installed', pkg ]);
+		prefix = pkg + '-';
+
+		for (let line in split(output, '\n')) {
+			line = trim_str(line);
+			if (index(line, prefix) == 0) {
+				let version = substr(line, length(prefix));
+				let end = index(version, ' ');
+				return end >= 0 ? substr(version, 0, end) : version;
+			}
+		}
+	}
+
+	if (!command_exists('opkg'))
+		return null;
+
+	output = read_command([ 'opkg', 'list-installed', pkg ]);
+	prefix = pkg + ' - ';
 
 	for (let line in split(output, '\n')) {
 		line = trim_str(line);
