@@ -35,6 +35,22 @@ Packages:
 
 The release APK packages are `noarch`, so the same assets are intended for supported OpenWrt targets across CPU architectures. Public releases remain validated for OpenWrt 25.12.1+ until 24.10 router smoke testing passes.
 
+## Screenshots
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screens/ru/screen_main_25_12_4.png" alt="IPRegion LuCI status overview"></td>
+    <td width="50%"><img src="docs/screens/ru/screen_geoip_direct_25_12_4.png" alt="GeoIP direct check results"></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screens/ru/screen_services_route_25_12_4.png" alt="Popular service route checks"></td>
+    <td width="50%"><img src="docs/screens/ru/screen_cdn_route_25_12_4.png" alt="CDN route checks"></td>
+  </tr>
+  <tr>
+    <td colspan="2"><img src="docs/screens/ru/screen_ai_25_12_2.jpg" alt="AI provider checks"></td>
+  </tr>
+</table>
+
 ## Install
 
 Run on the router:
