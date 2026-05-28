@@ -6,7 +6,9 @@
 
 [![CI](https://github.com/romanilyin/ipregion-openwrt/actions/workflows/ci.yml/badge.svg)](https://github.com/romanilyin/ipregion-openwrt/actions/workflows/ci.yml)
 
-IPRegion is an OpenWrt 25.12.1+ CLI and LuCI app for checking how GeoIP APIs, popular services, CDN endpoints and AI providers see your router route, interface or SOCKS5 proxy.
+IPRegion is an OpenWrt CLI and LuCI app for checking how GeoIP APIs, popular services, CDN endpoints and AI providers see your router route, interface or SOCKS5 proxy.
+
+Validated runtime targets: OpenWrt 25.12.1+ with `apk`, and OpenWrt 24.10.6 with `opkg`.
 
 ## Documentation
 
@@ -31,7 +33,7 @@ Packages:
 - `luci-app-ipregion`: LuCI UI under `Status -> IP Region`.
 - `luci-i18n-ipregion-ru`: Russian LuCI translation.
 
-The release APK packages are `noarch`, so the same assets are intended for supported OpenWrt 25.12.1+ targets across CPU architectures.
+The release `ipregion`, `luci-app-ipregion` and `luci-i18n-ipregion-ru` packages are `noarch`. APK assets are for OpenWrt 25.12.1+; IPK assets are for OpenWrt 24.10.*.
 
 ## Screenshots
 
@@ -49,9 +51,9 @@ The release APK packages are `noarch`, so the same assets are intended for suppo
   </tr>
 </table>
 
-## Install
+## Install APK
 
-Run on the router:
+Run on an OpenWrt 25.12.1+ router:
 
 ```sh
 wget -qO- https://raw.githubusercontent.com/romanilyin/ipregion-openwrt/main/install.sh | sh
@@ -59,9 +61,9 @@ wget -qO- https://raw.githubusercontent.com/romanilyin/ipregion-openwrt/main/ins
 
 The installer downloads `ipregion*.apk`, `luci-app-ipregion*.apk` and `luci-i18n-ipregion-ru*.apk` from the latest GitHub Release and installs them with `apk`.
 
-Options:
+APK installer options:
 
-- `IPREGION_RELEASE=2026.5.26-6`: install a specific GitHub release tag instead of `latest`.
+- `IPREGION_RELEASE=2026.5.28-1`: install a specific GitHub release tag instead of `latest`.
 - `IPREGION_INSTALL_LUCI=0`: install only the CLI/backend package.
 - `IPREGION_APK_UPDATE=0`: skip `apk update` before installation.
 - `IPREGION_DOWNLOAD_RETRIES=5`: retry GitHub metadata and APK downloads more times.
@@ -69,13 +71,29 @@ Options:
 Pinned release example:
 
 ```sh
-wget -qO- https://raw.githubusercontent.com/romanilyin/ipregion-openwrt/main/install.sh | IPREGION_RELEASE=2026.5.26-6 sh
+wget -qO- https://raw.githubusercontent.com/romanilyin/ipregion-openwrt/main/install.sh | IPREGION_RELEASE=2026.5.28-1 sh
 ```
 
 Manual install from downloaded APK files:
 
 ```sh
 apk add --allow-untrusted ./ipregion-*.apk ./luci-app-ipregion-*.apk ./luci-i18n-ipregion-ru-*.apk
+```
+
+## Install IPK
+
+Run on an OpenWrt 24.10.* router:
+
+```sh
+wget -qO- https://raw.githubusercontent.com/romanilyin/ipregion-openwrt/main/install-ipk.sh | sh
+```
+
+The IPK installer downloads `ipregion*.ipk`, `luci-app-ipregion*.ipk` and `luci-i18n-ipregion-ru*.ipk` from the latest GitHub Release and installs them with `opkg`. It is separate from the APK installer to avoid mixing OpenWrt package managers.
+
+Manual install from downloaded IPK files:
+
+```sh
+opkg install ./ipregion*.ipk ./luci-app-ipregion*.ipk ./luci-i18n-ipregion-ru*.ipk
 ```
 
 ## LuCI

@@ -5,13 +5,13 @@ set -eu
 REPO=${IPREGION_REPO:-romanilyin/ipregion-openwrt}
 RELEASE=${IPREGION_RELEASE:-latest}
 INSTALL_LUCI=${IPREGION_INSTALL_LUCI:-1}
-APK_UPDATE=${IPREGION_APK_UPDATE:-1}
-APK_FLAGS=${IPREGION_APK_FLAGS:---allow-untrusted}
+OPKG_UPDATE=${IPREGION_OPKG_UPDATE:-1}
+OPKG_FLAGS=${IPREGION_OPKG_FLAGS:-}
 GITHUB_API=${IPREGION_GITHUB_API:-https://api.github.com}
 GITHUB_DOWNLOAD_BASE=${IPREGION_GITHUB_DOWNLOAD_BASE:-https://github.com}
 DOWNLOAD_RETRIES=${IPREGION_DOWNLOAD_RETRIES:-3}
 DOWNLOAD_RETRY_DELAY=${IPREGION_DOWNLOAD_RETRY_DELAY:-2}
-TMP_DIR=${TMPDIR:-/tmp}/ipregion-install.$$
+TMP_DIR=${TMPDIR:-/tmp}/ipregion-ipk-install.$$
 RELEASE_JSON=$TMP_DIR/release.json
 DOWNLOAD_ERR=$TMP_DIR/download.err
 
@@ -19,11 +19,11 @@ GITHUB_API=${GITHUB_API%/}
 GITHUB_DOWNLOAD_BASE=${GITHUB_DOWNLOAD_BASE%/}
 
 log() {
-	printf '%s\n' "ipregion-install: $*"
+	printf '%s\n' "ipregion-ipk-install: $*"
 }
 
 die() {
-	printf '%s\n' "ipregion-install: error: $*" >&2
+	printf '%s\n' "ipregion-ipk-install: error: $*" >&2
 	exit 1
 }
 
@@ -68,19 +68,22 @@ check_target() {
 	need_cmd sed
 	need_cmd awk
 	[ "$(id -u)" = 0 ] || die "run this script as root on the router"
-	need_cmd apk
+	need_cmd opkg
+
+	if command -v apk >/dev/null 2>&1; then
+		die "apk is available on this router; use install.sh for APK-based OpenWrt"
+	fi
 
 	if [ -r /etc/openwrt_release ]; then
 		release=$(sed -n "s/^DISTRIB_RELEASE='\([^']*\)'.*/\1/p" /etc/openwrt_release | sed 's/-.*$//' || true)
 		case "$release" in
-			''|SNAPSHOT) ;;
-			*[!0-9.]*) log "warning: could not parse OpenWrt release; expected 25.12.1+ with apk" ;;
-			*)
-				version_ge "$release" 25.12.1 || die "OpenWrt $release is unsupported by this APK installer; expected 25.12.1+. For OpenWrt 24.10 use install-ipk.sh"
-				;;
+			24.10.*) ;;
+			''|SNAPSHOT) log "warning: OpenWrt release is $release; continuing because opkg is available" ;;
+			*[!0-9.]*) log "warning: could not parse OpenWrt release; expected 24.10.* with opkg" ;;
+			*) die "OpenWrt $release is unsupported by this IPK installer; expected 24.10.* with opkg" ;;
 		esac
 	else
-		log "warning: /etc/openwrt_release not found; continuing because apk is available"
+		log "warning: /etc/openwrt_release not found; continuing because opkg is available"
 	fi
 }
 
@@ -190,9 +193,9 @@ direct_release_asset_url() {
 	pkg=$1
 
 	if [ "$RELEASE" = latest ]; then
-		printf '%s/%s/releases/latest/download/%s.apk\n' "$GITHUB_DOWNLOAD_BASE" "$REPO" "$pkg"
+		printf '%s/%s/releases/latest/download/%s.ipk\n' "$GITHUB_DOWNLOAD_BASE" "$REPO" "$pkg"
 	else
-		printf '%s/%s/releases/download/%s/%s.apk\n' "$GITHUB_DOWNLOAD_BASE" "$REPO" "$RELEASE" "$pkg"
+		printf '%s/%s/releases/download/%s/%s.ipk\n' "$GITHUB_DOWNLOAD_BASE" "$REPO" "$RELEASE" "$pkg"
 	fi
 }
 
@@ -213,7 +216,7 @@ metadata_error_message() {
 }
 
 remove_downloaded_packages() {
-	rm -f "$TMP_DIR/ipregion.apk" "$TMP_DIR/luci-app-ipregion.apk" "$TMP_DIR/luci-i18n-ipregion-ru.apk"
+	rm -f "$TMP_DIR/ipregion.ipk" "$TMP_DIR/luci-app-ipregion.ipk" "$TMP_DIR/luci-i18n-ipregion-ru.ipk"
 }
 
 asset_url_for() {
@@ -226,12 +229,12 @@ asset_url_for() {
 			return name
 		}
 		function wanted(name) {
-			return name == pkg ".apk" || name ~ ("^" pkg "[-_].*\\.apk$")
+			return name == pkg ".ipk" || name ~ ("^" pkg "[-_].*\\.ipk$")
 		}
 		function consider(url, name) {
 			gsub(/\\\//, "/", url)
 			name = basename(url)
-			if (name == pkg ".apk") {
+			if (name == pkg ".ipk") {
 				print url
 				found = 1
 				exit
@@ -274,9 +277,9 @@ fetch_release_metadata() {
 
 fetch_package() {
 	pkg=$1
-	out=$TMP_DIR/$pkg.apk
+	out=$TMP_DIR/$pkg.ipk
 	url=$(asset_url_for "$pkg")
-	[ -n "$url" ] || { log "release asset not found in metadata: $pkg*.apk"; return 1; }
+	[ -n "$url" ] || { log "release asset not found in metadata: $pkg*.ipk"; return 1; }
 
 	log "downloading $pkg"
 	download "$url" "$out" "$pkg" || return 1
@@ -285,7 +288,7 @@ fetch_package() {
 
 fetch_direct_package() {
 	pkg=$1
-	out=$TMP_DIR/$pkg.apk
+	out=$TMP_DIR/$pkg.ipk
 	url=$(direct_release_asset_url "$pkg")
 
 	log "downloading $pkg from direct release asset"
@@ -330,22 +333,22 @@ diagnose_github_access() {
 	log "checking GitHub connectivity from this router"
 	probe_url "GitHub release page" "$GITHUB_DOWNLOAD_BASE/$REPO/releases"
 	probe_url "GitHub API" "$GITHUB_API"
-	probe_url "GitHub raw content" "https://raw.githubusercontent.com/$REPO/main/install.sh"
-	log "if GitHub is blocked or rate-limited, retry later or install downloaded APK files manually"
+	probe_url "GitHub raw content" "https://raw.githubusercontent.com/$REPO/main/install-ipk.sh"
+	log "if GitHub is blocked or rate-limited, retry later or install downloaded IPK files manually"
 }
 
 install_packages() {
-	if [ "$APK_UPDATE" = 1 ]; then
-		log "updating apk repositories"
-		apk update
+	if [ "$OPKG_UPDATE" = 1 ]; then
+		log "updating opkg repositories"
+		opkg update || log "warning: opkg update failed; local package installation will still be attempted"
 	fi
 
 	if is_luci_enabled; then
 		log "installing ipregion, luci-app-ipregion and Russian translation"
-		apk add $APK_FLAGS "$TMP_DIR/ipregion.apk" "$TMP_DIR/luci-app-ipregion.apk" "$TMP_DIR/luci-i18n-ipregion-ru.apk"
+		opkg install $OPKG_FLAGS "$TMP_DIR/ipregion.ipk" "$TMP_DIR/luci-app-ipregion.ipk" "$TMP_DIR/luci-i18n-ipregion-ru.ipk"
 	else
 		log "installing ipregion"
-		apk add $APK_FLAGS "$TMP_DIR/ipregion.apk"
+		opkg install $OPKG_FLAGS "$TMP_DIR/ipregion.ipk"
 	fi
 }
 

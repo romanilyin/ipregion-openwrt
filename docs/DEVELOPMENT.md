@@ -4,8 +4,8 @@ This document collects the technical details that are useful for maintainers, co
 
 ## Scope
 
-- Target OpenWrt version: `25.12.1+`.
-- Runtime package manager examples use `apk`.
+- Validated OpenWrt targets: `25.12.1+` with `apk`, and `24.10.6` with `opkg`.
+- Keep APK and IPK install flows separate; do not mix package managers in one installer.
 - `ipregion` is a `ucode` CLI/backend package.
 - `luci-app-ipregion` is a LuCI app backed by a narrow rpcd/ubus API.
 - `luci-i18n-ipregion-ru` provides the Russian LuCI translation.
@@ -57,6 +57,14 @@ scripts/build-sdk-packages.sh ath79/generic
 ```
 
 The packages are noarch, but testing several SDK targets catches feed, dependency and package metadata issues.
+
+24.10 SDK smoke:
+
+```sh
+OPENWRT_VERSION=24.10.6 scripts/build-sdk-packages.sh mediatek/filogic
+```
+
+The official 24.10.6 SDK emits IPK package files for this smoke build. Runtime installation for 24.10 uses the separate `install-ipk.sh` entrypoint and `opkg`.
 
 If a local throwaway host lacks OpenWrt SDK prerequisites, `IPREGION_SKIP_PREREQ=1` can bypass SDK prerequisite probing. Do not use that as proof for official package readiness; install the missing SDK host dependencies for real verification.
 
@@ -126,12 +134,13 @@ Endpoint failures must remain per-service and must not abort the whole run.
 
 ## Release Packaging
 
-The public GitHub Release installer is `install.sh` at the repository root.
+The public GitHub Release APK installer is `install.sh` at the repository root. The public IPK installer for OpenWrt 24.10 is `install-ipk.sh`.
 
 - It reads GitHub Release metadata, retries transient failures and falls back to direct stable asset URLs if GitHub API metadata is unavailable.
 - It downloads `ipregion*.apk`, `luci-app-ipregion*.apk` and `luci-i18n-ipregion-ru*.apk`.
 - It installs with `apk` and `--allow-untrusted` by default because GitHub Release APKs are not from the official OpenWrt package repository.
 - It supports `IPREGION_RELEASE`, `IPREGION_INSTALL_LUCI`, `IPREGION_APK_UPDATE`, `IPREGION_REPO`, `IPREGION_GITHUB_API`, `IPREGION_GITHUB_DOWNLOAD_BASE`, `IPREGION_DOWNLOAD_RETRIES`, `IPREGION_DOWNLOAD_RETRY_DELAY` and `IPREGION_APK_FLAGS`.
+- `install-ipk.sh` downloads matching `.ipk` release assets and installs them with `opkg`; it supports `IPREGION_OPKG_UPDATE` and `IPREGION_OPKG_FLAGS` instead of APK-specific options.
 - The LuCI update button is kept for public GitHub Release builds and is guarded against downgrades when the installed package is newer than the latest GitHub release.
 
 Before publishing a release:
@@ -139,7 +148,7 @@ Before publishing a release:
 - run `scripts/ci/static-checks.sh`
 - run `scripts/ci/ucode-checks.sh` with a local `ucode` build
 - build packages in an OpenWrt SDK
-- upload versioned APK assets and stable aliases named `ipregion.apk`, `luci-app-ipregion.apk` and `luci-i18n-ipregion-ru.apk`
+- upload versioned APK/IPK assets and stable aliases named `ipregion.apk`, `luci-app-ipregion.apk`, `luci-i18n-ipregion-ru.apk`, `ipregion.ipk`, `luci-app-ipregion.ipk` and `luci-i18n-ipregion-ru.ipk`
 - run focused router smoke tests
 - verify LuCI after hard refresh and `rpcd` restart
 
