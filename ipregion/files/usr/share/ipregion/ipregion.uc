@@ -5,7 +5,7 @@
 import * as fs from 'fs';
 import { cursor } from 'uci';
 
-const VERSION = '2026.5.26-6';
+const VERSION = '2026.5.28-1';
 const CATALOG_PATH = getenv('IPREGION_CATALOG_PATH') || '/usr/share/ipregion/services.json';
 const AI_CATALOG_PATH = getenv('IPREGION_AI_CATALOG_PATH') || '/usr/share/ipregion/services-ai.json';
 const RUNTIME_DIR = getenv('IPREGION_RUNTIME_DIR') || '/tmp/run/ipregion';

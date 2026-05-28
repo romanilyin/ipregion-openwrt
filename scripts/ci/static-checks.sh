@@ -69,9 +69,12 @@ missing_po = sorted(m for m in messages if f'msgid "{m}"' not in po)
 if missing_pot or missing_po:
     raise SystemExit(f'missing gettext strings: pot={missing_pot} po={missing_po}')
 
-for doc in [root / 'README.md', root / 'docs/README.ru.md']:
-    if 'opkg' in doc.read_text(encoding='utf-8'):
-        raise SystemExit(f'{doc.name} must not contain opkg runtime instructions')
+install_sh = (root / 'install.sh').read_text(encoding='utf-8')
+install_ipk = (root / 'install-ipk.sh').read_text(encoding='utf-8')
+if 'opkg' in install_sh:
+    raise SystemExit('install.sh must stay APK-only; put opkg logic in install-ipk.sh')
+if 'apk add' in install_ipk or '.apk' in install_ipk:
+    raise SystemExit('install-ipk.sh must stay IPK-only; put apk package install logic in install.sh')
 
 print(f'Service catalog OK: {len(services)} services')
 print(f'AI provider catalog OK: {len(ai_catalog)} providers')
@@ -85,6 +88,7 @@ sh -n "$ROOT_DIR/scripts/ci/build-ucode.sh"
 sh -n "$ROOT_DIR/scripts/ci/ucode-checks.sh"
 sh -n "$ROOT_DIR/scripts/build-sdk-packages.sh"
 sh -n "$ROOT_DIR/install.sh"
+sh -n "$ROOT_DIR/install-ipk.sh"
 sh -n "$ROOT_DIR/ipregion/files/usr/bin/ipregion"
 sh -n "$ROOT_DIR/ipregion/files/etc/uci-defaults/90_ipregion"
 
