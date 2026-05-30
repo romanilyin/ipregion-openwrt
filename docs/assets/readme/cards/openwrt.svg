@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="58" viewBox="0 0 96 58" role="img" aria-label="OpenWrt">
+  <title>OpenWrt</title>
+  <rect width="96" height="58" rx="8" fill="#0D1117"/>
+  <rect x="1" y="1" width="94" height="56" rx="7" fill="#00B5E2"/>
+  <rect x="1" y="39" width="94" height="18" rx="0" fill="#035A91"/>
+  <text x="48" y="28" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Arial,sans-serif" font-size="22" font-weight="800" fill="#061A23">OW</text>
+  <text x="48" y="52" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Arial,sans-serif" font-size="10" font-weight="600" fill="#FFFFFF">OpenWrt</text>
+</svg>
