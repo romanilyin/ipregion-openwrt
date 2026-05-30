@@ -1,19 +1,32 @@
-<p align="center">
-  <img src="../luci-app-ipregion/htdocs/luci-static/resources/ipregion/logo.png" width="128" height="128" alt="Логотип IPRegion for OpenWrt">
-</p>
+<div align="center">
+
+<img src="../luci-app-ipregion/htdocs/luci-static/resources/ipregion/logo.png" width="128" height="128" alt="Логотип IPRegion for OpenWrt">
 
 # IPRegion for OpenWrt
+
+**Диагностика маршрута, региона, CDN и AI endpoint-ов для OpenWrt-роутеров.**
+
+[English](../README.md) |
+[Русский](./README.ru.md) |
+[Development](./DEVELOPMENT.md) |
+[Разработка](./DEVELOPMENT.ru.md) |
+[Releases](https://github.com/romanilyin/ipregion-openwrt/releases)
+
+[![CI](https://github.com/romanilyin/ipregion-openwrt/actions/workflows/ci.yml/badge.svg)](https://github.com/romanilyin/ipregion-openwrt/actions/workflows/ci.yml)
+
+<p>
+  <a href="#что-делает"><img src="./assets/readme/cards/openwrt.svg" alt="OpenWrt" height="52"></a>
+  <a href="#cli"><img src="./assets/readme/cards/cli.svg" alt="CLI" height="52"></a>
+  <a href="#luci"><img src="./assets/readme/cards/luci.svg" alt="LuCI" height="52"></a>
+  <a href="#установка-apk"><img src="./assets/readme/cards/apk.svg" alt="APK packages" height="52"></a>
+  <a href="#установка-ipk"><img src="./assets/readme/cards/ipk.svg" alt="IPK packages" height="52"></a>
+</p>
+
+</div>
 
 IPRegion это CLI и LuCI-приложение для OpenWrt, которое проверяет, как GeoIP API, популярные сервисы, CDN endpoint-ы и AI-провайдеры видят маршрут роутера, интерфейс или SOCKS5-прокси.
 
 Проверенные runtime-цели: OpenWrt 25.12.1+ с `apk` и OpenWrt 24.10.6 с `opkg`.
-
-## Документация
-
-- English: [../README.md](../README.md).
-- Русский: этот файл.
-- Для разработчиков и упаковки: [DEVELOPMENT.ru.md](DEVELOPMENT.ru.md).
-- Developer notes in English: [DEVELOPMENT.md](DEVELOPMENT.md).
 
 ## Что Делает
 
