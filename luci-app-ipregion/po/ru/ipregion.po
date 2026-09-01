@@ -405,3 +405,201 @@ msgstr "Задайте сохраненный SOCKS5 proxy в настройка
 
 msgid "Use saved SOCKS5 proxy"
 msgstr "Использовать сохраненный SOCKS5 proxy"
+
+msgid "A successful encrypted DNS check does not prove that ordinary UDP or TCP port 53 is free from interception."
+msgstr "Успешная проверка зашифрованного DNS не доказывает отсутствие перехвата обычного UDP или TCP на порту 53."
+
+msgid "Answer"
+msgstr "Ответ"
+
+msgid "Check whether major public DNS resolvers are reachable over authenticated DoH and DoT connections."
+msgstr "Проверяет доступность основных публичных DNS-резолверов через аутентифицированные соединения DoH и DoT."
+
+msgid "DNS Security"
+msgstr "Безопасность DNS"
+
+msgid "DNS checks use the IP mode, interface and timeout controls above. DoH binds to the selected interface; DoT binds to its source address. SOCKS5 proxy routing is not used."
+msgstr "DNS-проверки используют выбранные выше режим IP, интерфейс и таймаут. DoH привязывается к выбранному интерфейсу, а DoT - к его исходному адресу. SOCKS5-прокси не применяется."
+
+msgid "DNS provider"
+msgstr "DNS-провайдер"
+
+msgid "DNS security check started"
+msgstr "Проверка безопасности DNS запущена"
+
+msgid "DNS security check failed to start"
+msgstr "Не удалось запустить проверку безопасности DNS"
+
+msgid "DNS security check failed to stop"
+msgstr "Не удалось остановить проверку безопасности DNS"
+
+msgid "DNS security summary"
+msgstr "Сводка безопасности DNS"
+
+msgid "DNS status"
+msgstr "Статус DNS"
+
+msgid "DoH and DoT"
+msgstr "DoH и DoT"
+
+msgid "DoH and DoT connect directly to published resolver IP addresses and verify the provider TLS hostname."
+msgstr "DoH и DoT подключаются напрямую к опубликованным IP-адресам резолвера и проверяют TLS-имя провайдера."
+
+msgid "DoH only"
+msgstr "Только DoH"
+
+msgid "DoT only"
+msgstr "Только DoT"
+
+msgid "Encrypted DNS results"
+msgstr "Результаты зашифрованного DNS"
+
+msgid "Encrypted DNS transport"
+msgstr "Транспорт зашифрованного DNS"
+
+msgid "Endpoint"
+msgstr "Endpoint"
+
+msgid "Failed"
+msgstr "Ошибок"
+
+msgid "Findings"
+msgstr "Выводы"
+
+msgid "Not verified"
+msgstr "Не проверен"
+
+msgid "Passed"
+msgstr "Успешно"
+
+msgid "Probe name"
+msgstr "Проверяемое имя"
+
+msgid "Record type"
+msgstr "Тип записи"
+
+msgid "Run DNS check"
+msgstr "Запустить DNS-проверку"
+
+msgid "TLS"
+msgstr "TLS"
+
+msgid "Verified"
+msgstr "Проверен"
+
+msgid "OK"
+msgstr "OK"
+
+msgid "Fallback address"
+msgstr "Резервный адрес"
+
+msgid "Certificate failed"
+msgstr "Ошибка сертификата"
+
+msgid "TLS failed"
+msgstr "Ошибка TLS"
+
+msgid "Connection failed"
+msgstr "Ошибка подключения"
+
+msgid "HTTP error"
+msgstr "Ошибка HTTP"
+
+msgid "NXDOMAIN"
+msgstr "NXDOMAIN"
+
+msgid "SERVFAIL"
+msgstr "SERVFAIL"
+
+msgid "DNS error"
+msgstr "Ошибка DNS"
+
+msgid "No answer"
+msgstr "Нет ответа"
+
+msgid "Malformed response"
+msgstr "Некорректный ответ"
+
+msgid "Unavailable"
+msgstr "Недоступен"
+
+msgid "DNS transport"
+msgstr "DNS-транспорт"
+
+msgid "DNS worker did not stop"
+msgstr "Не удалось остановить DNS worker"
+
+msgid "returned a valid authenticated DNS response."
+msgstr "вернул корректный аутентифицированный DNS-ответ."
+
+msgid "succeeded through a fallback resolver address."
+msgstr "успешно сработал через резервный адрес резолвера."
+
+msgid "did not respond before timeout; the endpoint or transport may be dropped."
+msgstr "не ответил до истечения таймаута; endpoint или транспорт может блокироваться."
+
+msgid "certificate validation failed; check system time or possible TLS interception."
+msgstr "не прошел проверку сертификата; проверьте системное время и возможный перехват TLS."
+
+msgid "TLS handshake failed."
+msgstr "не смог установить TLS-соединение."
+
+msgid "TCP connection failed or was reset."
+msgstr "не смог установить TCP-соединение или соединение было сброшено."
+
+msgid "DoH returned an HTTP error."
+msgstr "DoH вернул ошибку HTTP."
+
+msgid "The resolver returned NXDOMAIN for the probe name."
+msgstr "Резолвер вернул NXDOMAIN для проверяемого имени."
+
+msgid "The resolver returned SERVFAIL for the probe name."
+msgstr "Резолвер вернул SERVFAIL для проверяемого имени."
+
+msgid "The resolver returned a DNS error response."
+msgstr "Резолвер вернул ответ с ошибкой DNS."
+
+msgid "The resolver returned NOERROR without a usable answer."
+msgstr "Резолвер вернул NOERROR без пригодного ответа."
+
+msgid "The endpoint returned a malformed or mismatched DNS response."
+msgstr "Endpoint вернул некорректный или не соответствующий запросу DNS-ответ."
+
+msgid "The requested DNS transport is unavailable."
+msgstr "Запрошенный DNS-транспорт недоступен."
+
+msgid "DoH and DoT returned different DNS response codes."
+msgstr "DoH и DoT вернули разные коды DNS-ответа."
+
+msgid "DoH and DoT returned different answers; resolver or CDN variation may be legitimate."
+msgstr "DoH и DoT вернули разные ответы; это может быть допустимой вариацией резолвера или CDN."
+
+msgid "DoH works while DoT fails; TCP/853 may be filtered."
+msgstr "DoH работает, а DoT нет; TCP/853 может фильтроваться."
+
+msgid "DoT works while DoH fails; the DoH endpoint may be filtered."
+msgstr "DoT работает, а DoH нет; DoH endpoint может фильтроваться."
+
+msgid "both encrypted DNS transports are unavailable."
+msgstr "оба транспорта зашифрованного DNS недоступны."
+
+msgid "Stop the DNS security check before clearing its results"
+msgstr "Остановите проверку безопасности DNS перед очисткой ее результатов"
+
+msgid "DNS query name is invalid"
+msgstr "Некорректное DNS-имя запроса"
+
+msgid "DNS provider is invalid"
+msgstr "Некорректный DNS-провайдер"
+
+msgid "Network interface is invalid"
+msgstr "Некорректный сетевой интерфейс"
+
+msgid "Unknown error"
+msgstr "Неизвестная ошибка"
+
+msgid "No DNS providers matched the requested filters"
+msgstr "Нет DNS-провайдеров, соответствующих выбранным фильтрам"
+
+msgid "kdig is required for DNS-over-TLS checks"
+msgstr "Для проверок DNS-over-TLS требуется kdig"

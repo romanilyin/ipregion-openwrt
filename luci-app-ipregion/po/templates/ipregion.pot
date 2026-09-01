@@ -404,3 +404,201 @@ msgstr ""
 
 msgid "Use saved SOCKS5 proxy"
 msgstr ""
+
+msgid "A successful encrypted DNS check does not prove that ordinary UDP or TCP port 53 is free from interception."
+msgstr ""
+
+msgid "Answer"
+msgstr ""
+
+msgid "Check whether major public DNS resolvers are reachable over authenticated DoH and DoT connections."
+msgstr ""
+
+msgid "DNS Security"
+msgstr ""
+
+msgid "DNS checks use the IP mode, interface and timeout controls above. DoH binds to the selected interface; DoT binds to its source address. SOCKS5 proxy routing is not used."
+msgstr ""
+
+msgid "DNS provider"
+msgstr ""
+
+msgid "DNS security check started"
+msgstr ""
+
+msgid "DNS security check failed to start"
+msgstr ""
+
+msgid "DNS security check failed to stop"
+msgstr ""
+
+msgid "DNS security summary"
+msgstr ""
+
+msgid "DNS status"
+msgstr ""
+
+msgid "DoH and DoT"
+msgstr ""
+
+msgid "DoH and DoT connect directly to published resolver IP addresses and verify the provider TLS hostname."
+msgstr ""
+
+msgid "DoH only"
+msgstr ""
+
+msgid "DoT only"
+msgstr ""
+
+msgid "Encrypted DNS results"
+msgstr ""
+
+msgid "Encrypted DNS transport"
+msgstr ""
+
+msgid "Endpoint"
+msgstr ""
+
+msgid "Failed"
+msgstr ""
+
+msgid "Findings"
+msgstr ""
+
+msgid "Not verified"
+msgstr ""
+
+msgid "Passed"
+msgstr ""
+
+msgid "Probe name"
+msgstr ""
+
+msgid "Record type"
+msgstr ""
+
+msgid "Run DNS check"
+msgstr ""
+
+msgid "TLS"
+msgstr ""
+
+msgid "Verified"
+msgstr ""
+
+msgid "OK"
+msgstr ""
+
+msgid "Fallback address"
+msgstr ""
+
+msgid "Certificate failed"
+msgstr ""
+
+msgid "TLS failed"
+msgstr ""
+
+msgid "Connection failed"
+msgstr ""
+
+msgid "HTTP error"
+msgstr ""
+
+msgid "NXDOMAIN"
+msgstr ""
+
+msgid "SERVFAIL"
+msgstr ""
+
+msgid "DNS error"
+msgstr ""
+
+msgid "No answer"
+msgstr ""
+
+msgid "Malformed response"
+msgstr ""
+
+msgid "Unavailable"
+msgstr ""
+
+msgid "DNS transport"
+msgstr ""
+
+msgid "DNS worker did not stop"
+msgstr ""
+
+msgid "returned a valid authenticated DNS response."
+msgstr ""
+
+msgid "succeeded through a fallback resolver address."
+msgstr ""
+
+msgid "did not respond before timeout; the endpoint or transport may be dropped."
+msgstr ""
+
+msgid "certificate validation failed; check system time or possible TLS interception."
+msgstr ""
+
+msgid "TLS handshake failed."
+msgstr ""
+
+msgid "TCP connection failed or was reset."
+msgstr ""
+
+msgid "DoH returned an HTTP error."
+msgstr ""
+
+msgid "The resolver returned NXDOMAIN for the probe name."
+msgstr ""
+
+msgid "The resolver returned SERVFAIL for the probe name."
+msgstr ""
+
+msgid "The resolver returned a DNS error response."
+msgstr ""
+
+msgid "The resolver returned NOERROR without a usable answer."
+msgstr ""
+
+msgid "The endpoint returned a malformed or mismatched DNS response."
+msgstr ""
+
+msgid "The requested DNS transport is unavailable."
+msgstr ""
+
+msgid "DoH and DoT returned different DNS response codes."
+msgstr ""
+
+msgid "DoH and DoT returned different answers; resolver or CDN variation may be legitimate."
+msgstr ""
+
+msgid "DoH works while DoT fails; TCP/853 may be filtered."
+msgstr ""
+
+msgid "DoT works while DoH fails; the DoH endpoint may be filtered."
+msgstr ""
+
+msgid "both encrypted DNS transports are unavailable."
+msgstr ""
+
+msgid "Stop the DNS security check before clearing its results"
+msgstr ""
+
+msgid "DNS query name is invalid"
+msgstr ""
+
+msgid "DNS provider is invalid"
+msgstr ""
+
+msgid "Network interface is invalid"
+msgstr ""
+
+msgid "Unknown error"
+msgstr ""
+
+msgid "No DNS providers matched the requested filters"
+msgstr ""
+
+msgid "kdig is required for DNS-over-TLS checks"
+msgstr ""

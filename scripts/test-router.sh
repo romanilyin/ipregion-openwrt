@@ -16,7 +16,7 @@ fi
 
 ssh_target="$OPENWRT_USER@$OPENWRT_HOST"
 ssh_opts="-o BatchMode=no -o NumberOfPasswordPrompts=1 -o StrictHostKeyChecking=accept-new"
-remote_cmd="mkdir -p /tmp/run/ipregion; ipregion --self-test --json; ipregion --list-services --json >/tmp/run/ipregion/services.json; ipregion --group primary --ipv4 --json >/tmp/run/ipregion/smoke.json"
+remote_cmd="mkdir -p /tmp/run/ipregion && ipregion --self-test --json && ipregion --list-services --json >/tmp/run/ipregion/services.json && ipregion --list-dns-providers --json >/tmp/run/ipregion/dns-providers.json && ipregion --group primary --ipv4 --json >/tmp/run/ipregion/smoke.json && ipregion dns --provider google --transport doh --ip-mode ipv4 --json >/tmp/run/ipregion/dns-doh-smoke.json && ipregion dns --provider google --transport dot --ip-mode ipv4 --json >/tmp/run/ipregion/dns-dot-smoke.json"
 
 password_ssh() {
 	if command -v sshpass >/dev/null 2>&1; then

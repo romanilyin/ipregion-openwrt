@@ -77,6 +77,8 @@ if [ ! -d "$sdk_dir" ]; then
 fi
 
 cd "$sdk_dir"
+PATH="$sdk_dir/staging_dir/hostpkg/bin:$PATH"
+export PATH
 ln -sfn "$ROOT_DIR" package/ipregion-openwrt
 
 if [ "$IPREGION_FEEDS_UPDATE" = 1 ]; then
@@ -90,9 +92,12 @@ fi
 
 cat > .config <<'EOF'
 CONFIG_HAVE_DOT_CONFIG=y
+# CONFIG_ALL is not set
+# CONFIG_ALL_NONSHARED is not set
+# CONFIG_ALL_KMODS is not set
 CONFIG_PACKAGE_ipregion=m
 CONFIG_PACKAGE_luci-app-ipregion=m
-CONFIG_PACKAGE_luci-i18n-ipregion-ru=m
+CONFIG_LUCI_LANG_ru=y
 EOF
 
 make defconfig

@@ -5,8 +5,10 @@
 
 var regionPollTimer = null;
 var aiPollTimer = null;
+var dnsPollTimer = null;
 var currentGeneratedAt = null;
 var aiGeneratedAt = null;
+var dnsGeneratedAt = null;
 var referenceCountry = '';
 
 var callGetConfig = rpc.declare({ object: 'luci.ipregion', method: 'get_config', expect: { '': {} } });
@@ -27,6 +29,13 @@ var callAiStatus = rpc.declare({ object: 'luci.ipregion', method: 'ai_status', e
 var callAiResult = rpc.declare({ object: 'luci.ipregion', method: 'ai_result', expect: { '': {} } });
 var callAiLog = rpc.declare({ object: 'luci.ipregion', method: 'ai_log', expect: { '': {} } });
 var callAiClear = rpc.declare({ object: 'luci.ipregion', method: 'ai_clear', expect: { '': {} } });
+var callDnsProviders = rpc.declare({ object: 'luci.ipregion', method: 'list_dns_providers', expect: { '': {} } });
+var callDnsStart = rpc.declare({ object: 'luci.ipregion', method: 'dns_start', params: [ 'options' ], expect: { '': {} } });
+var callDnsStop = rpc.declare({ object: 'luci.ipregion', method: 'dns_stop', expect: { '': {} } });
+var callDnsStatus = rpc.declare({ object: 'luci.ipregion', method: 'dns_status', expect: { '': {} } });
+var callDnsResult = rpc.declare({ object: 'luci.ipregion', method: 'dns_result', expect: { '': {} } });
+var callDnsLog = rpc.declare({ object: 'luci.ipregion', method: 'dns_log', expect: { '': {} } });
+var callDnsClear = rpc.declare({ object: 'luci.ipregion', method: 'dns_clear', expect: { '': {} } });
 
 function fieldValue(id) {
 	var node = document.getElementById(id);
@@ -105,6 +114,93 @@ function aiBadge(row) {
 		cls += ' ipregion-error';
 
 	return E('span', { 'class': cls }, [ label ]);
+}
+
+function dnsBadge(row) {
+	var status = row && row.status || 'unavailable';
+	var labels = {
+		ok: _('OK'),
+		degraded: _('Fallback address'),
+		timeout: _('Timeout'),
+		certificate_failed: _('Certificate failed'),
+		tls_failed: _('TLS failed'),
+		connection_failed: _('Connection failed'),
+		http_failed: _('HTTP error'),
+		dns_nxdomain: _('NXDOMAIN'),
+		dns_servfail: _('SERVFAIL'),
+		dns_error: _('DNS error'),
+		no_answer: _('No answer'),
+		malformed_response: _('Malformed response'),
+		unavailable: _('Unavailable')
+	};
+	var label = labels[status] || row && row.label || _('N/A');
+	var cls = 'ipregion-badge';
+
+	if (status === 'ok')
+		cls += ' ipregion-ok';
+	else if (status === 'degraded' || status === 'dns_nxdomain' || status === 'dns_servfail' || status === 'dns_error' || status === 'no_answer')
+		cls += ' ipregion-warn';
+	else if (status === 'unavailable')
+		cls += ' ipregion-na';
+	else
+		cls += ' ipregion-error';
+
+	return E('span', { 'class': cls }, [ label ]);
+}
+
+function dnsDiagnosis(row) {
+	var transport = row && (row.transport_label || row.transport) || _('DNS transport');
+	switch (row && row.status) {
+	case 'ok': return transport + ' ' + _('returned a valid authenticated DNS response.');
+	case 'degraded': return transport + ' ' + _('succeeded through a fallback resolver address.');
+	case 'timeout': return transport + ' ' + _('did not respond before timeout; the endpoint or transport may be dropped.');
+	case 'certificate_failed': return transport + ' ' + _('certificate validation failed; check system time or possible TLS interception.');
+	case 'tls_failed': return transport + ' ' + _('TLS handshake failed.');
+	case 'connection_failed': return transport + ' ' + _('TCP connection failed or was reset.');
+	case 'http_failed': return _('DoH returned an HTTP error.');
+	case 'dns_nxdomain': return _('The resolver returned NXDOMAIN for the probe name.');
+	case 'dns_servfail': return _('The resolver returned SERVFAIL for the probe name.');
+	case 'dns_error': return _('The resolver returned a DNS error response.');
+	case 'no_answer': return _('The resolver returned NOERROR without a usable answer.');
+	case 'malformed_response': return _('The endpoint returned a malformed or mismatched DNS response.');
+	case 'unavailable': return _('The requested DNS transport is unavailable.');
+	default: return row && row.diagnosis || _('Unknown error');
+	}
+}
+
+function dnsFinding(finding) {
+	var prefix = (finding.name || finding.id || '') + ' ' + (finding.ip_label || '') + ': ';
+	switch (finding.code) {
+	case 'rcode_mismatch': return prefix + _('DoH and DoT returned different DNS response codes.');
+	case 'answer_mismatch': return prefix + _('DoH and DoT returned different answers; resolver or CDN variation may be legitimate.');
+	case 'dot_unavailable': return prefix + _('DoH works while DoT fails; TCP/853 may be filtered.');
+	case 'doh_unavailable': return prefix + _('DoT works while DoH fails; the DoH endpoint may be filtered.');
+	case 'both_unavailable': return prefix + _('both encrypted DNS transports are unavailable.');
+	default: return finding.message || finding.code || '';
+	}
+}
+
+function dnsStartError(result) {
+	switch (result && result.error) {
+	case 'invalid_dns_name': return _('DNS query name is invalid');
+	case 'invalid_dns_provider': return _('DNS provider is invalid');
+	case 'invalid_interface': return _('Network interface is invalid');
+	case 'dns_stop_failed': return _('DNS worker did not stop');
+	default: return result && (result.message || result.error) || _('Unknown error');
+	}
+}
+
+function dnsErrorText(error) {
+	switch (error && error.code) {
+	case 'no_dns_providers': return error.code + ': ' + _('No DNS providers matched the requested filters');
+	case 'kdig_missing': return error.code + ': ' + _('kdig is required for DNS-over-TLS checks');
+	default: return error && (error.code + ': ' + (error.message || _('Unknown error'))) || _('Unknown error');
+	}
+}
+
+function dnsAnswers(row) {
+	var answers = row && row.answers || [];
+	return answers.length ? answers.map(function(answer) { return answer.value; }).join(', ') : _('N/A');
 }
 
 function resultCell(result) {
@@ -228,6 +324,54 @@ function renderAiTable(rows) {
 	]);
 }
 
+function dnsRowId(row) {
+	return safeId(row.row_id || ((row.id || row.name) + '-' + (row.transport || '') + '-' + (row.ip_label || row.ip_version || '')));
+}
+
+function renderDnsRow(row) {
+	var id = dnsRowId(row);
+
+	return E('tr', { 'class': 'tr ipregion-dns-data-row', 'id': 'ipregion-dns-row-' + id }, [
+		E('td', { 'class': 'td' }, [ row.name || row.id ]),
+		E('td', { 'class': 'td' }, [ row.transport_label || row.transport || '' ]),
+		E('td', { 'class': 'td' }, [ row.ip_label || ('IPv' + row.ip_version) ]),
+		E('td', { 'class': 'td', 'id': 'ipregion-dns-endpoint-' + id }, [ row.endpoint || _('N/A') ]),
+		E('td', { 'class': 'td', 'id': 'ipregion-dns-tls-' + id }, [ row.tls_verified ? _('Verified') : _('Not verified') ]),
+		E('td', { 'class': 'td', 'id': 'ipregion-dns-status-' + id }, [ dnsBadge(row), row.rcode ? ' ' + row.rcode : '' ]),
+		E('td', { 'class': 'td', 'id': 'ipregion-dns-answer-' + id }, [ dnsAnswers(row) ]),
+		E('td', { 'class': 'td', 'id': 'ipregion-dns-time-' + id }, [ row.latency_ms != null ? row.latency_ms + ' ms' : _('N/A') ]),
+		E('td', { 'class': 'td', 'id': 'ipregion-dns-diagnosis-' + id }, [ dnsDiagnosis(row) ])
+	]);
+}
+
+function renderDnsTable(rows) {
+	rows = rows || [];
+	var tableRows = [
+		E('tr', { 'class': 'tr table-titles' }, [
+			E('th', { 'class': 'th' }, [ _('Provider') ]),
+			E('th', { 'class': 'th' }, [ _('Transport') ]),
+			E('th', { 'class': 'th' }, [ _('Network') ]),
+			E('th', { 'class': 'th' }, [ _('Endpoint') ]),
+			E('th', { 'class': 'th' }, [ _('TLS') ]),
+			E('th', { 'class': 'th' }, [ _('DNS status') ]),
+			E('th', { 'class': 'th' }, [ _('Answer') ]),
+			E('th', { 'class': 'th' }, [ _('Time') ]),
+			E('th', { 'class': 'th' }, [ _('Diagnosis') ])
+		])
+	];
+
+	if (rows.length)
+		rows.forEach(function(row) { tableRows.push(renderDnsRow(row)); });
+	else
+		tableRows.push(E('tr', { 'class': 'tr ipregion-dns-empty-row', 'id': 'ipregion-dns-empty' }, [ E('td', { 'class': 'td', 'colspan': 9 }, [ _('No results yet') ]) ]));
+
+	return E('div', { 'class': 'ipregion-card ipregion-table-card' }, [
+		E('h3', {}, [ _('Encrypted DNS results') ]),
+		E('p', { 'class': 'ipregion-muted' }, [ _('DoH and DoT connect directly to published resolver IP addresses and verify the provider TLS hostname.') ]),
+		E('table', { 'class': 'table', 'id': 'ipregion-dns-table' }, tableRows)
+	]);
+}
+
 function clearGroupRows(group) {
 	var table = document.getElementById('ipregion-table-' + group);
 	if (!table)
@@ -248,6 +392,16 @@ function clearAiRows() {
 		table.appendChild(E('tr', { 'class': 'tr ipregion-ai-empty-row', 'id': 'ipregion-ai-empty' }, [ E('td', { 'class': 'td', 'colspan': 7 }, [ _('No results yet') ]) ]));
 }
 
+function clearDnsRows() {
+	var table = document.getElementById('ipregion-dns-table');
+	if (!table)
+		return;
+
+	Array.prototype.slice.call(table.querySelectorAll('.ipregion-dns-data-row')).forEach(function(row) { row.remove(); });
+	if (!document.getElementById('ipregion-dns-empty'))
+		table.appendChild(E('tr', { 'class': 'tr ipregion-dns-empty-row', 'id': 'ipregion-dns-empty' }, [ E('td', { 'class': 'td', 'colspan': 9 }, [ _('No results yet') ]) ]));
+}
+
 function resetResultUi() {
 	currentGeneratedAt = null;
 	[ 'primary', 'custom', 'cdn' ].forEach(clearGroupRows);
@@ -266,6 +420,14 @@ function resetAiUi() {
 	setContent('ipregion-ai-egress-country', [ _('Country'), ': ', _('N/A') ]);
 	setContent('ipregion-ai-egress-asn', [ _('ASN'), ': ', _('N/A') ]);
 	setContent('ipregion-ai-errors', '');
+}
+
+function resetDnsUi() {
+	dnsGeneratedAt = null;
+	clearDnsRows();
+	setContent('ipregion-dns-summary', '');
+	setContent('ipregion-dns-findings', '');
+	setContent('ipregion-dns-errors', '');
 }
 
 function updateGroupRows(group, rows) {
@@ -325,6 +487,35 @@ function updateAiRows(rows) {
 		table.appendChild(E('tr', { 'class': 'tr ipregion-ai-empty-row', 'id': 'ipregion-ai-empty' }, [ E('td', { 'class': 'td', 'colspan': 7 }, [ _('No results yet') ]) ]));
 }
 
+function updateDnsRows(rows) {
+	rows = rows || [];
+	var table = document.getElementById('ipregion-dns-table');
+	if (!table)
+		return;
+
+	var empty = document.getElementById('ipregion-dns-empty');
+	if (rows.length && empty)
+		empty.remove();
+
+	rows.forEach(function(row) {
+		var id = dnsRowId(row);
+		var existing = document.getElementById('ipregion-dns-row-' + id);
+		if (!existing) {
+			table.appendChild(renderDnsRow(row));
+			return;
+		}
+		setContent('ipregion-dns-endpoint-' + id, row.endpoint || _('N/A'));
+		setContent('ipregion-dns-tls-' + id, row.tls_verified ? _('Verified') : _('Not verified'));
+		setContent('ipregion-dns-status-' + id, [ dnsBadge(row), row.rcode ? ' ' + row.rcode : '' ]);
+		setContent('ipregion-dns-answer-' + id, dnsAnswers(row));
+		setContent('ipregion-dns-time-' + id, row.latency_ms != null ? row.latency_ms + ' ms' : _('N/A'));
+		setContent('ipregion-dns-diagnosis-' + id, dnsDiagnosis(row));
+	});
+
+	if (!rows.length && !document.getElementById('ipregion-dns-empty'))
+		table.appendChild(E('tr', { 'class': 'tr ipregion-dns-empty-row', 'id': 'ipregion-dns-empty' }, [ E('td', { 'class': 'td', 'colspan': 9 }, [ _('No results yet') ]) ]));
+}
+
 function renderOptions(config, interfaces) {
 	interfaces = interfaces && interfaces.interfaces || [];
 	var group = config.group || 'all';
@@ -380,6 +571,44 @@ function renderAiOptions(providers) {
 		}))) ]),
 		E('p', { 'class': 'ipregion-muted ipregion-group-help' }, [ _('AI provider checks use the same IP mode, interface, proxy and timeout controls above. IPv4 and IPv6 mode checks both transports separately.') ]),
 		E('p', { 'class': 'ipregion-muted ipregion-group-help' }, [ _('Safe mode is used by default. It does not store API keys and only checks whether provider endpoint domains are reachable through their selected routes.') ])
+	]);
+}
+
+function renderDnsOptions(providers, result) {
+	providers = providers || [];
+	var request = result && result.request || {};
+
+	return E('div', { 'class': 'ipregion-card ipregion-options' }, [
+		E('label', {}, [ _('DNS provider'), E('select', { 'id': 'ipregion-dns-provider' }, [
+			E('option', { 'value': '' }, [ _('All providers') ])
+		].concat(providers.map(function(provider) {
+			return E('option', { 'value': provider.id }, [ provider.name || provider.id ]);
+		}))) ]),
+		E('label', {}, [ _('Encrypted DNS transport'), E('select', { 'id': 'ipregion-dns-transport' }, [
+			E('option', { 'value': 'both' }, [ _('DoH and DoT') ]),
+			E('option', { 'value': 'doh' }, [ _('DoH only') ]),
+			E('option', { 'value': 'dot' }, [ _('DoT only') ])
+		]) ]),
+		E('label', {}, [ _('Probe name'), E('input', { 'id': 'ipregion-dns-name', 'type': 'text', 'value': request.name || 'example.com' }) ]),
+		E('label', {}, [ _('Record type'), E('select', { 'id': 'ipregion-dns-type' }, [
+			E('option', { 'value': 'A', 'selected': request.type !== 'AAAA' ? 'selected' : null }, [ 'A' ]),
+			E('option', { 'value': 'AAAA', 'selected': request.type === 'AAAA' ? 'selected' : null }, [ 'AAAA' ])
+		]) ]),
+		E('p', { 'class': 'ipregion-muted ipregion-group-help' }, [ _('DNS checks use the IP mode, interface and timeout controls above. DoH binds to the selected interface; DoT binds to its source address. SOCKS5 proxy routing is not used.') ]),
+		E('p', { 'class': 'ipregion-muted ipregion-group-help' }, [ _('A successful encrypted DNS check does not prove that ordinary UDP or TCP port 53 is free from interception.') ])
+	]);
+}
+
+function renderDnsSummary(result) {
+	var summary = result && result.summary || {};
+	var findings = (summary.finding_details || []).length ? summary.finding_details.map(dnsFinding) : summary.findings || [];
+	return E('div', { 'class': 'ipregion-card' }, [
+		E('h3', {}, [ _('DNS security summary') ]),
+		E('p', { 'id': 'ipregion-dns-summary' }, [ _('Passed'), ': ', String(summary.passed || 0), ' / ', _('Failed'), ': ', String(summary.failed || 0) ]),
+		E('div', { 'id': 'ipregion-dns-findings' }, findings.length ? [
+			E('h4', {}, [ _('Findings') ]),
+			E('ul', {}, findings.map(function(finding) { return E('li', {}, [ finding ]); }))
+		] : [])
 	]);
 }
 
@@ -493,14 +722,31 @@ function updateAiState(state) {
 		stop.disabled = state.running ? false : true;
 }
 
-function updateErrors(id, errors) {
+function updateDnsState(state) {
+	state = state || {};
+	setContent('ipregion-dns-state-running', state.running ? _('Running') : _('Idle'));
+	setContent('ipregion-dns-state-current', state.current ? [ _('Current check'), ': ', state.current ] : '');
+	setContent('ipregion-dns-state-progress', state.total ? [ _('Progress'), ': ', String(state.finished || 0), ' / ', String(state.total) ] : '');
+
+	var stop = document.getElementById('ipregion-dns-stop');
+	if (stop)
+		stop.disabled = state.running ? false : true;
+	var run = document.getElementById('ipregion-dns-run');
+	if (run)
+		run.disabled = state.running ? true : false;
+	var clear = document.getElementById('ipregion-dns-clear');
+	if (clear)
+		clear.disabled = state.running ? true : false;
+}
+
+function updateErrors(id, errors, formatter) {
 	var node = document.getElementById(id);
 	if (!node)
 		return;
 
 	setContent(node, (errors || []).length ? [
 		E('h3', {}, [ _('Errors') ]),
-		E('ul', {}, errors.map(function(err) { return E('li', {}, [ err.code + ': ' + err.message ]); }))
+		E('ul', {}, errors.map(function(err) { return E('li', {}, [ formatter ? formatter(err) : err.code + ': ' + err.message ]); }))
 	] : '');
 }
 
@@ -535,6 +781,25 @@ function applyAiResult(result) {
 	updateAiRows(result.providers || []);
 }
 
+function applyDnsResult(result) {
+	result = result || {};
+	var summary = result.summary || {};
+
+	if (result.generated_at && dnsGeneratedAt && result.generated_at !== dnsGeneratedAt)
+		clearDnsRows();
+	if (result.generated_at)
+		dnsGeneratedAt = result.generated_at;
+
+	updateDnsRows(result.probes || []);
+	updateErrors('ipregion-dns-errors', result.errors, dnsErrorText);
+	setContent('ipregion-dns-summary', [ _('Passed'), ': ', String(summary.passed || 0), ' / ', _('Failed'), ': ', String(summary.failed || 0) ]);
+	var findings = (summary.finding_details || []).length ? summary.finding_details.map(dnsFinding) : summary.findings || [];
+	setContent('ipregion-dns-findings', findings.length ? [
+		E('h4', {}, [ _('Findings') ]),
+		E('ul', {}, findings.map(function(finding) { return E('li', {}, [ finding ]); }))
+	] : '');
+}
+
 function pollRegionOnce() {
 	return Promise.all([ callStatus(), callResult() ]).then(function(data) {
 		var state = data[0] || {};
@@ -565,6 +830,21 @@ function pollAiOnce() {
 	});
 }
 
+function pollDnsOnce() {
+	return Promise.all([ callDnsStatus(), callDnsResult() ]).then(function(data) {
+		var state = data[0] || {};
+		var result = data[1] || {};
+		updateDnsState(state);
+		applyDnsResult(result);
+
+		if (state.running) {
+			if (dnsPollTimer)
+				window.clearTimeout(dnsPollTimer);
+			dnsPollTimer = window.setTimeout(pollDnsOnce, 1500);
+		}
+	});
+}
+
 function routeOptions() {
 	return {
 		ip_mode: fieldValue('ipregion-ip-mode'),
@@ -574,9 +854,17 @@ function routeOptions() {
 	};
 }
 
+function dnsRouteOptions() {
+	return {
+		ip_mode: fieldValue('ipregion-ip-mode'),
+		interface: fieldValue('ipregion-interface'),
+		timeout: fieldValue('ipregion-timeout')
+	};
+}
+
 return view.extend({
 	load: function() {
-		return Promise.all([ callGetConfig(), callInterfaces(), callStatus(), callResult(), callVersion(), callAiProviders(), callAiStatus(), callAiResult() ]);
+		return Promise.all([ callGetConfig(), callInterfaces(), callStatus(), callResult(), callVersion(), callAiProviders(), callAiStatus(), callAiResult(), callDnsProviders(), callDnsStatus(), callDnsResult() ]);
 	},
 
 	render: function(data) {
@@ -588,11 +876,15 @@ return view.extend({
 		var providers = data[5] && data[5].providers || [];
 		var aiState = data[6] || {};
 		var aiResult = data[7] || {};
+		var dnsProviders = data[8] && data[8].providers || [];
+		var dnsState = data[9] || {};
+		var dnsResult = data[10] || {};
 		var results = result.results || {};
 		referenceCountry = normalizeCountryCode(config.reference_country);
 
 		currentGeneratedAt = result.generated_at || null;
 		aiGeneratedAt = aiResult.generated_at || null;
+		dnsGeneratedAt = dnsResult.generated_at || null;
 
 		var page = E('div', { 'class': 'ipregion-page' }, [
 			E('link', { 'rel': 'stylesheet', 'href': L.resource('ipregion/ipregion.css') }),
@@ -643,6 +935,67 @@ return view.extend({
 			renderGroup(_('CDN services'), 'cdn', results.cdn, groupDescription('cdn')),
 
 			E('hr'),
+			E('div', { 'class': 'ipregion-hero' }, [
+				E('div', {}, [
+					E('h2', {}, [ _('DNS Security') ]),
+					E('p', {}, [ _('Check whether major public DNS resolvers are reachable over authenticated DoH and DoT connections.') ])
+				])
+			]),
+			renderDnsOptions(dnsProviders, dnsResult),
+			E('div', { 'class': 'ipregion-actions' }, [
+				E('button', { 'id': 'ipregion-dns-run', 'class': 'btn cbi-button cbi-button-apply', 'disabled': dnsState.running ? 'disabled' : null, 'click': ui.createHandlerFn(this, function() {
+					var provider = fieldValue('ipregion-dns-provider');
+					resetDnsUi();
+					return callDnsStart(Object.assign(dnsRouteOptions(), {
+						transport: fieldValue('ipregion-dns-transport'),
+						name: fieldValue('ipregion-dns-name'),
+						type: fieldValue('ipregion-dns-type'),
+						providers: provider ? [ provider ] : []
+					})).then(function(res) {
+						if (res && res.error) {
+							ui.addNotification(null, E('p', {}, [ _('DNS security check failed to start') + ': ' + dnsStartError(res) ]), 'error');
+							return;
+						}
+						updateDnsState(res || {});
+						ui.addNotification(null, E('p', {}, [ _('DNS security check started') ]));
+						return pollDnsOnce();
+					});
+				}) }, [ _('Run DNS check') ]),
+				E('button', { 'id': 'ipregion-dns-stop', 'class': 'btn cbi-button cbi-button-remove', 'disabled': dnsState.running ? null : 'disabled', 'click': ui.createHandlerFn(this, function() {
+					return callDnsStop().then(function(res) {
+						if (res && res.error)
+							ui.addNotification(null, E('p', {}, [ _('DNS security check failed to stop') + ': ' + dnsStartError(res) ]), 'error');
+						return pollDnsOnce();
+					});
+				}) }, [ _('Stop') ]),
+				E('button', { 'class': 'btn cbi-button', 'click': pollDnsOnce }, [ _('Refresh result') ]),
+				E('button', { 'class': 'btn cbi-button', 'click': function() { callDnsResult().then(function(res) { downloadJson(res, 'ipregion-dns-result.json'); }); } }, [ _('Download JSON') ]),
+				E('button', { 'class': 'btn cbi-button', 'click': ui.createHandlerFn(this, function() { return callDnsLog().then(function(res) { ui.showModal(_('Runtime log'), [ E('pre', {}, [ res.log || _('Log is empty') ]), E('div', { 'class': 'right' }, [ E('button', { 'class': 'btn cbi-button', 'click': ui.hideModal }, [ _('Close') ]) ]) ]); }); }) }, [ _('Show log') ]),
+				E('button', { 'id': 'ipregion-dns-clear', 'class': 'btn cbi-button cbi-button-reset', 'disabled': dnsState.running ? 'disabled' : null, 'click': ui.createHandlerFn(this, function() {
+					return callDnsClear().then(function(res) {
+						if (res && res.error) {
+							ui.addNotification(null, E('p', {}, [ _('Stop the DNS security check before clearing its results') ]), 'error');
+							return;
+						}
+						resetDnsUi();
+						return pollDnsOnce();
+					});
+				}) }, [ _('Clear results') ])
+			]),
+			E('div', { 'class': 'ipregion-card' }, [
+				E('h3', {}, [ _('Runtime state') ]),
+				E('p', { 'id': 'ipregion-dns-state-running' }, [ dnsState.running ? _('Running') : _('Idle') ]),
+				E('p', { 'id': 'ipregion-dns-state-current' }, dnsState.current ? [ _('Current check'), ': ', dnsState.current ] : []),
+				E('p', { 'id': 'ipregion-dns-state-progress' }, dnsState.total ? [ _('Progress'), ': ', String(dnsState.finished || 0), ' / ', String(dnsState.total) ] : [])
+			]),
+			renderDnsSummary(dnsResult),
+			E('div', { 'id': 'ipregion-dns-errors', 'class': 'ipregion-card ipregion-error-card' }, (dnsResult.errors || []).length ? [
+				E('h3', {}, [ _('Errors') ]),
+				E('ul', {}, dnsResult.errors.map(function(err) { return E('li', {}, [ dnsErrorText(err) ]); }))
+			] : []),
+			renderDnsTable(dnsResult.probes),
+
+			E('hr'),
 			E('div', { 'class': 'ipregion-hero ipregion-ai-hero' }, [
 				E('div', {}, [
 					E('h2', {}, [ _('AI Providers') ]),
@@ -689,6 +1042,9 @@ return view.extend({
 
 		if (aiState.running)
 			aiPollTimer = window.setTimeout(pollAiOnce, 1500);
+
+		if (dnsState.running)
+			dnsPollTimer = window.setTimeout(pollDnsOnce, 1500);
 
 		return page;
 	}

@@ -4,13 +4,13 @@
     "read": {
       "uci": [ "ipregion" ],
       "ubus": {
-        "luci.ipregion": [ "get_config", "list_services", "list_ai_providers", "list_interfaces", "detected_country", "status", "result", "log", "ai_status", "ai_result", "ai_log", "selftest", "version" ]
+        "luci.ipregion": [ "get_config", "list_services", "list_ai_providers", "list_dns_providers", "list_interfaces", "detected_country", "status", "result", "log", "ai_status", "ai_result", "ai_log", "dns_status", "dns_result", "dns_log", "selftest", "version" ]
       }
     },
     "write": {
       "uci": [ "ipregion" ],
       "ubus": {
-        "luci.ipregion": [ "start", "stop", "clear", "ai_start", "ai_stop", "ai_clear", "update" ]
+        "luci.ipregion": [ "start", "stop", "clear", "ai_start", "ai_stop", "ai_clear", "dns_start", "dns_stop", "dns_clear", "update" ]
       }
     }
   }

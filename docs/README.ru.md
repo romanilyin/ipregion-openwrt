@@ -4,7 +4,7 @@
 
 # IPRegion for OpenWrt
 
-**Диагностика маршрута, региона, CDN и AI endpoint-ов для OpenWrt-роутеров.**
+**Диагностика маршрута, региона, CDN, AI endpoint-ов и зашифрованного DNS для OpenWrt-роутеров.**
 
 [English](../README.md) |
 [Русский](./README.ru.md) |
@@ -24,7 +24,7 @@
 
 </div>
 
-IPRegion это CLI и LuCI-приложение для OpenWrt, которое проверяет, как GeoIP API, популярные сервисы, CDN endpoint-ы и AI-провайдеры видят маршрут роутера, интерфейс или SOCKS5-прокси.
+IPRegion это CLI и LuCI-приложение для OpenWrt, которое проверяет, как GeoIP API, популярные сервисы, CDN endpoint-ы и AI-провайдеры видят маршрут роутера, а также доступность публичных DoH- и DoT-резолверов без транспортных аномалий.
 
 Проверенные runtime-цели: OpenWrt 25.12.1+ с `apk` и OpenWrt 24.10.6 с `opkg`.
 
@@ -36,6 +36,7 @@ IPRegion запускает диагностику на самом роутер�
 - Проверки популярных сервисов показывают регион, доступ, rate-limit или отказ от крупных платформ.
 - CDN-проверки показывают, до какого CDN edge или региона доходит роутер.
 - AI-проверки безопасно проверяют реальные домены AI API endpoint-ов без авторизации.
+- Проверки безопасности DNS обращаются к аутентифицированным DoH- и DoT-endpoint-ам Google, Cloudflare, Quad9 и AdGuard DNS.
 - Проверки могут идти через маршрут по умолчанию, выбранный OpenWrt-интерфейс или SOCKS5-прокси.
 
 Пакеты:
@@ -74,7 +75,7 @@ Installer скачивает `ipregion*.apk`, `luci-app-ipregion*.apk` и `luci-
 
 Опции APK installer:
 
-- `IPREGION_RELEASE=2026.5.28-1`: поставить конкретный GitHub release tag вместо `latest`.
+- `IPREGION_RELEASE=2026.9.1-1`: поставить конкретный GitHub release tag вместо `latest`.
 - `IPREGION_INSTALL_LUCI=0`: поставить только CLI/backend пакет.
 - `IPREGION_APK_UPDATE=0`: не запускать `apk update` перед установкой.
 - `IPREGION_DOWNLOAD_RETRIES=5`: увеличить число повторов для GitHub metadata и APK downloads.
@@ -82,7 +83,7 @@ Installer скачивает `ipregion*.apk`, `luci-app-ipregion*.apk` и `luci-
 Пример с фиксированным release:
 
 ```sh
-wget -qO- https://raw.githubusercontent.com/romanilyin/ipregion-openwrt/main/install.sh | IPREGION_RELEASE=2026.5.28-1 sh
+wget -qO- https://raw.githubusercontent.com/romanilyin/ipregion-openwrt/main/install.sh | IPREGION_RELEASE=2026.9.1-1 sh
 ```
 
 Ручная установка скачанных APK:
@@ -99,7 +100,7 @@ apk add --allow-untrusted ./ipregion-*.apk ./luci-app-ipregion-*.apk ./luci-i18n
 wget -qO- https://raw.githubusercontent.com/romanilyin/ipregion-openwrt/main/install-ipk.sh | sh
 ```
 
-IPK installer скачивает `ipregion*.ipk`, `luci-app-ipregion*.ipk` и `luci-i18n-ipregion-ru*.ipk` из последнего GitHub Release и ставит их через `opkg`. Он отдельный от APK installer, чтобы не смешивать package managers OpenWrt.
+IPK installer по умолчанию использует последний релиз, проверенный на реальном OpenWrt 24.10, `2026.5.28-1`, и ставит его assets `ipregion*.ipk`, `luci-app-ipregion*.ipk` и `luci-i18n-ipregion-ru*.ipk` через `opkg`. Задавайте `IPREGION_RELEASE` только для другого релиза, в котором явно опубликованы проверенные IPK assets.
 
 Ручная установка скачанных IPK:
 
@@ -111,7 +112,7 @@ opkg install ./ipregion*.ipk ./luci-app-ipregion*.ipk ./luci-i18n-ipregion-ru*.i
 
 Откройте `Status -> IP Region` в LuCI.
 
-- Запускайте GeoIP, popular service, CDN и AI endpoint проверки с одной страницы.
+- Запускайте GeoIP, popular service, CDN, encrypted DNS и AI endpoint проверки с одной страницы.
 - Выбирайте IP mode, interface, SOCKS5 proxy, timeout и GeoIP mode.
 - Настройте сохраненный SOCKS5 proxy в `Services -> IP Region`, затем выберите его на странице Status.
 - Задавайте реальную страну, чтобы совпадающие значения подсвечивались оранжевым, а отличающиеся - синим.
@@ -135,6 +136,8 @@ ipregion --interface wan --group primary --json
 ipregion --proxy 127.0.0.1:1080 --proxy-dns remote --group custom --json
 ipregion ai --json
 ipregion ai --provider google_gemini --json
+ipregion dns --json
+ipregion dns --provider google --transport both --ip-mode ipv4 --json
 ```
 
 ## Режимы Проверок
@@ -147,6 +150,8 @@ ipregion ai --provider google_gemini --json
 - `--geoip-mode route`: спросить поддерживаемые GeoIP API, какую страну они видят для самого запроса.
 - `ipregion ai --json`: безопасно проверить AI provider endpoint-ы без хранения или запроса API-ключей.
 - `ipregion ai --ip-mode both --json`: проверить каждого выбранного AI-провайдера отдельными IPv4 и IPv6 probe.
+- `ipregion dns --json`: проверить аутентифицированные DoH- и DoT-соединения со включенными публичными DNS-провайдерами.
+- `ipregion dns --dns-name example.com --dns-type A --json`: выполнить encrypted DNS probe для проверенного доменного имени и типа записи.
 
 Для SOCKS5 proxy checks:
 
@@ -156,12 +161,16 @@ ipregion ai --provider google_gemini --json
 ## Примечания
 
 - `401`, `403`, `404`, `405` и `429` в AI mode могут означать, что endpoint достигнут; DNS, TLS, timeout и network failures классифицируются отдельно.
+- Encrypted DNS-проверки подключаются к опубликованным IP резолверов и проверяют TLS-имя провайдера, не полагаясь на текущий bootstrap DNS роутера.
+- DNS mode игнорирует сохраненный в UCI proxy и отклоняет явный `--proxy`; DoH привязывается к выбранному интерфейсу, а DoT - к исходному адресу этого интерфейса.
+- DNS mode `auto` предпочитает доступный IPv4 default route и переключается на IPv6 на IPv6-only роутерах; для явной проверки обоих используйте `--ip-mode both`.
+- Успешная DoH- или DoT-проверка не доказывает отсутствие перехвата обычного DNS на UDP/TCP-порту 53.
 - При domain-based split routing общий egress IP может отличаться от маршрута конкретного сервиса или AI endpoint domain.
 - Для policy-routing сценариев локальный SOCKS5 endpoint, который уже выходит через нужный туннель, обычно самый надежный объект диагностики.
 
 ## Приватность И Scope
 
-Диагностика обращается к сторонним GeoIP, streaming, CDN и AI endpoint-ам. Эти сервисы получают публичный IP роутера для каждой проверки.
+Диагностика обращается к сторонним GeoIP, streaming, CDN, AI и публичным DNS endpoint-ам. Эти сервисы получают публичный IP роутера для каждой проверки.
 
 Runtime state, results и logs остаются локально в `/tmp/run/ipregion/`.
 

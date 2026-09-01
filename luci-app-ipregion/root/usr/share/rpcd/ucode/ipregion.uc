@@ -7,6 +7,7 @@ import { cursor } from 'uci';
 
 const CATALOG_PATH = '/usr/share/ipregion/services.json';
 const AI_CATALOG_PATH = '/usr/share/ipregion/services-ai.json';
+const DNS_CATALOG_PATH = '/usr/share/ipregion/services-dns.json';
 const RUN_DIR = '/tmp/run/ipregion';
 const STATE_FILE = RUN_DIR + '/state.json';
 const RESULT_FILE = RUN_DIR + '/result.json';
@@ -14,6 +15,10 @@ const LOG_FILE = RUN_DIR + '/log.txt';
 const AI_STATE_FILE = RUN_DIR + '/ai-state.json';
 const AI_RESULT_FILE = RUN_DIR + '/ai-result.json';
 const AI_LOG_FILE = RUN_DIR + '/ai-log.txt';
+const DNS_STATE_FILE = RUN_DIR + '/dns-state.json';
+const DNS_RESULT_FILE = RUN_DIR + '/dns-result.json';
+const DNS_LOG_FILE = RUN_DIR + '/dns-log.txt';
+const DNS_WORKER_FILE = RUN_DIR + '/dns-worker.json';
 const UPDATE_STATE_FILE = RUN_DIR + '/update-state.json';
 const UPDATE_LOG_FILE = RUN_DIR + '/update.log';
 const GITHUB_REPO = 'romanilyin/ipregion-openwrt';
@@ -55,6 +60,21 @@ function valid_proxy(value) {
 
 function trim_str(value) {
 	return rtrim(ltrim('' + (value ?? '')));
+}
+
+function valid_dns_name(value) {
+	value = trim_str(value || '');
+	if (length(value) < 1 || length(value) > 253 || !match(value, /^[A-Za-z0-9.-]+$/) || index(value, '..') >= 0)
+		return false;
+
+	if (substr(value, length(value) - 1) == '.')
+		value = substr(value, 0, length(value) - 1);
+
+	for (let label in split(value, '.'))
+		if (length(label) < 1 || length(label) > 63 || substr(label, 0, 1) == '-' || substr(label, length(label) - 1) == '-')
+			return false;
+
+	return true;
 }
 
 function upper_ascii(value) {
@@ -150,6 +170,51 @@ function process_alive(pid) {
 		return false;
 
 	return system('kill -0 ' + pid + ' 2>/dev/null') == 0;
+}
+
+function process_start_time(pid) {
+	let stat = fs.readfile('/proc/' + int(pid) + '/stat');
+	let end = stat != null ? rindex(stat, ') ') : -1;
+	if (end < 0)
+		return null;
+	let fields = split(substr(stat, end + 2), ' ');
+	let started = int(fields[19]);
+	return started == started && started > 0 ? started : null;
+}
+
+function dns_worker_alive(worker) {
+	if (!worker || !process_alive(worker.pid))
+		return false;
+	let expected_start = int(worker.pid_start);
+	if (expected_start != expected_start || expected_start <= 0 || process_start_time(worker.pid) != expected_start)
+		return false;
+	let command = fs.readfile('/proc/' + int(worker.pid) + '/cmdline') || '';
+	let is_worker = index(command, '/usr/share/ipregion/ipregion.uc') >= 0 || index(command, '/usr/bin/ipregion') >= 0;
+	return is_worker && index(command, 'dns') >= 0;
+}
+
+function process_group_alive(pgid) {
+	pgid = int(pgid);
+	return pgid == pgid && pgid > 0 && system('kill -0 -' + pgid + ' 2>/dev/null') == 0;
+}
+
+function stop_process_group(pid, expected_start) {
+	pid = int(pid);
+	if (pid != pid || pid <= 0 || process_start_time(pid) != int(expected_start))
+		return true;
+	system('kill -TERM -' + pid + ' 2>/dev/null');
+	system('sleep 1');
+	if (process_group_alive(pid)) {
+		system('kill -KILL -' + pid + ' 2>/dev/null');
+		system('sleep 1');
+	}
+	return !process_group_alive(pid);
+}
+
+function clear_dns_temp_files() {
+	for (let entry in fs.lsdir(RUN_DIR) || [])
+		if (match(entry, /^doh-[A-Za-z0-9_.:-]+-[46]-[0-9]+(\.[0-9]+)?\.bin$/))
+			fs.unlink(RUN_DIR + '/' + entry);
 }
 
 function current_config() {
@@ -463,6 +528,71 @@ function normalized_ai_options(input) {
 	};
 }
 
+function normalized_dns_options(input) {
+	let options = normalized_options(input);
+	let transport = valid_enum(input && input.transport, [ 'both', 'doh', 'dot' ], 'both');
+	let transport_valid = !input || input.transport == null || valid_enum(input.transport, [ 'both', 'doh', 'dot' ], null) != null;
+	let raw_type = input && input.type != null ? input.type : 'A';
+	let query_type = valid_enum(upper_ascii(raw_type), [ 'A', 'AAAA' ], 'A');
+	let type_valid = (!input || input.type == null || type(input.type) == 'string') && valid_enum(upper_ascii(raw_type), [ 'A', 'AAAA' ], null) != null;
+	let raw_name = input && input.name != null ? input.name : 'example.com';
+	let name = type(raw_name) == 'string' ? trim_str(raw_name) : '';
+	let name_valid = type(raw_name) == 'string' && valid_dns_name(name);
+	let ip_mode_valid = !input || input.ip_mode == null || valid_enum(input.ip_mode, [ 'auto', 'ipv4', 'ipv6', 'both' ], null) != null;
+	let interface_valid = true;
+	if (input && input.interface != null) {
+		let requested_interface = type(input.interface) == 'string' ? trim_str(input.interface) : null;
+		interface_valid = requested_interface != null && (requested_interface == '' || requested_interface == options.interface);
+	}
+	let providers = input && input.providers != null ? input.providers : [];
+
+	if (type(providers) == 'string')
+		providers = [ providers ];
+	let providers_valid = type(providers) == 'array';
+	if (!providers_valid)
+		providers = [];
+
+	let catalog = read_json_file(DNS_CATALOG_PATH, { providers: [] });
+	let safe_providers = [];
+	for (let provider in providers) {
+		let found = false;
+		if (valid_token(provider))
+			for (let known in catalog.providers || [])
+				if (known.id == provider) {
+					found = true;
+					break;
+				}
+		if (!found) {
+			providers_valid = false;
+			continue;
+		}
+		let duplicate = false;
+		for (let selected in safe_providers)
+			if (selected == provider) {
+				duplicate = true;
+				break;
+			}
+		if (!duplicate)
+			push(safe_providers, provider);
+	}
+
+	return {
+		transport: transport,
+		transport_valid: transport_valid,
+		name: name,
+		name_valid: name_valid,
+		type_valid: type_valid,
+		ip_mode_valid: ip_mode_valid,
+		interface_valid: interface_valid,
+		providers_valid: providers_valid,
+		type: query_type,
+		providers: safe_providers,
+		ip_mode: options.ip_mode,
+		timeout: options.timeout,
+		interface: options.interface
+	};
+}
+
 const methods = {
 	get_config: {
 		call: function(req) {
@@ -479,6 +609,12 @@ const methods = {
 	list_ai_providers: {
 		call: function(req) {
 			return { providers: read_json_file(AI_CATALOG_PATH, []) };
+		}
+	},
+
+	list_dns_providers: {
+		call: function(req) {
+			return read_json_file(DNS_CATALOG_PATH, { version: 0, providers: [] });
 		}
 	},
 
@@ -669,6 +805,151 @@ const methods = {
 			fs.unlink(AI_RESULT_FILE);
 			fs.unlink(AI_LOG_FILE);
 
+			return { cleared: true };
+		}
+	},
+
+	dns_start: {
+		args: { options: {} },
+		call: function(req) {
+			try {
+				let existing_worker = read_json_file(DNS_WORKER_FILE, {});
+				if (dns_worker_alive(existing_worker)) {
+					let existing = read_json_file(DNS_STATE_FILE, {});
+					existing.running = true;
+					existing.pid = existing_worker.pid;
+					existing.pid_start = existing_worker.pid_start;
+					return existing;
+				}
+
+				let input = req && req.args ? req.args.options : req && req.options ? req.options : {};
+				let options = normalized_dns_options(input || {});
+				if (!options.name_valid)
+					return { running: false, error: 'invalid_dns_name', message: 'DNS query name is invalid' };
+				if (!options.transport_valid)
+					return { running: false, error: 'invalid_dns_transport', message: 'DNS transport is invalid' };
+				if (!options.type_valid)
+					return { running: false, error: 'invalid_dns_type', message: 'DNS query type is invalid' };
+				if (!options.ip_mode_valid)
+					return { running: false, error: 'invalid_ip_mode', message: 'IP mode is invalid' };
+				if (!options.providers_valid)
+					return { running: false, error: 'invalid_dns_provider', message: 'DNS provider is invalid' };
+				if (!options.interface_valid)
+					return { running: false, error: 'invalid_interface', message: 'Network interface is invalid' };
+				if (system('command -v setsid >/dev/null 2>&1') != 0)
+					return { running: false, error: 'dns_start_failed', message: 'setsid is required for DNS worker isolation' };
+				let args = [ '/usr/bin/ipregion', 'dns', '--no-uci', '--transport', options.transport, '--dns-name', options.name, '--dns-type', options.type, '--ip-mode', options.ip_mode, '--timeout', '' + options.timeout, '--output', DNS_RESULT_FILE ];
+
+				if (options.interface != '')
+					push(args, '--interface', options.interface);
+				for (let id in options.providers)
+					push(args, '--provider', id);
+
+				ensure_run_dir();
+				fs.unlink(DNS_RESULT_FILE);
+				fs.unlink(DNS_LOG_FILE);
+				fs.unlink(DNS_WORKER_FILE);
+				let state = {
+					running: true,
+					started_at: time(),
+					mode: 'dns',
+					transport: options.transport,
+					current: 'Starting',
+					current_id: 'start',
+					finished: 0,
+					total: 0,
+					result_file: DNS_RESULT_FILE,
+					log_file: DNS_LOG_FILE
+				};
+				atomic_write(DNS_STATE_FILE, sprintf('%J\n', state));
+				let cmd = 'setsid ' + shell_cmd(args) + ' > ' + shell_quote(DNS_LOG_FILE) + ' 2>&1 & echo $!';
+				let pipe = fs.popen(cmd, 'r');
+				let pid = pipe ? int(trim_str(pipe.read('all') || '')) : 0;
+				if (pipe) pipe.close();
+				let pid_start = process_start_time(pid);
+				if (pid_start == null) {
+					state.running = false;
+					state.error = 'dns_start_failed';
+					state.message = 'DNS worker did not start';
+					atomic_write(DNS_STATE_FILE, sprintf('%J\n', state));
+					return { running: false, error: 'dns_start_failed', message: 'DNS worker did not start' };
+				}
+
+				atomic_write(DNS_WORKER_FILE, sprintf('%J\n', { pid: pid, pid_start: pid_start }));
+				state.pid = pid;
+				state.pid_start = pid_start;
+				return state;
+			}
+			catch (e) {
+				return { running: false, error: 'dns_start_failed', message: '' + e };
+			}
+		}
+	},
+
+	dns_status: {
+		call: function(req) {
+			let state = read_json_file(DNS_STATE_FILE, { running: false, result_file: DNS_RESULT_FILE, log_file: DNS_LOG_FILE });
+			let worker = read_json_file(DNS_WORKER_FILE, {});
+			if (dns_worker_alive(worker)) {
+				state.running = true;
+				state.pid = worker.pid;
+				state.pid_start = worker.pid_start;
+			}
+			else {
+				let changed = state.running || state.pid != null || state.pid_start != null;
+				state.running = false;
+				state.pid = null;
+				state.pid_start = null;
+				state.finished_at = state.finished_at || time();
+				fs.unlink(DNS_WORKER_FILE);
+				if (changed)
+					atomic_write(DNS_STATE_FILE, sprintf('%J\n', state));
+			}
+			return state;
+		}
+	},
+
+	dns_result: {
+		call: function(req) {
+			return read_json_file(DNS_RESULT_FILE, { version: 1, mode: 'dns', probes: [], summary: { status: 'ok', findings: [], finding_details: [] }, errors: [] });
+		}
+	},
+
+	dns_log: {
+		call: function(req) {
+			return { log: fs.readfile(DNS_LOG_FILE, 32768) || '' };
+		}
+	},
+
+	dns_stop: {
+		call: function(req) {
+			let worker = read_json_file(DNS_WORKER_FILE, {});
+			if (dns_worker_alive(worker) && !stop_process_group(worker.pid, worker.pid_start))
+				return { running: true, error: 'dns_stop_failed', message: 'DNS worker did not stop' };
+			let state = read_json_file(DNS_STATE_FILE, {});
+			clear_dns_temp_files();
+			fs.unlink(DNS_WORKER_FILE);
+			state.running = false;
+			state.pid = null;
+			state.pid_start = null;
+			state.current = null;
+			state.current_id = null;
+			state.stopped_at = time();
+			atomic_write(DNS_STATE_FILE, sprintf('%J\n', state));
+			return state;
+		}
+	},
+
+	dns_clear: {
+		call: function(req) {
+			let state = read_json_file(DNS_STATE_FILE, {});
+			if (dns_worker_alive(read_json_file(DNS_WORKER_FILE, {})))
+				return { cleared: false, error: 'dns_running', message: 'Stop the DNS security check before clearing its results' };
+			clear_dns_temp_files();
+			fs.unlink(DNS_WORKER_FILE);
+			fs.unlink(DNS_STATE_FILE);
+			fs.unlink(DNS_RESULT_FILE);
+			fs.unlink(DNS_LOG_FILE);
 			return { cleared: true };
 		}
 	},
