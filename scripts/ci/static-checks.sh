@@ -63,6 +63,10 @@ for provider in dns_catalog.get('providers', []):
     if not provider_id or provider_id in dns_ids:
         raise SystemExit(f'invalid duplicate DNS provider id: {provider_id}')
     dns_ids.add(provider_id)
+    if provider.get('dynamic') == 'interface':
+        if provider.get('plain_only') is not True:
+            raise SystemExit('dynamic interface DNS provider must be plain-only')
+        continue
     if not provider.get('doh_url', '').startswith('https://'):
         raise SystemExit(f'DNS provider {provider_id} has no HTTPS DoH URL')
     if not provider.get('doh_hostname') or not provider.get('dot_hostname'):
@@ -90,6 +94,33 @@ missing_pot = sorted(m for m in messages if f'msgid "{m}"' not in pot)
 missing_po = sorted(m for m in messages if f'msgid "{m}"' not in po)
 if missing_pot or missing_po:
     raise SystemExit(f'missing gettext strings: pot={missing_pot} po={missing_po}')
+
+pot_messages = set(re.findall(r'^msgid "(.*)"$', pot, re.MULTILINE)) - {''}
+po_messages = set(re.findall(r'^msgid "(.*)"$', po, re.MULTILINE)) - {''}
+extra_pot = sorted(pot_messages - messages)
+extra_po = sorted(po_messages - messages)
+if extra_pot or extra_po:
+    raise SystemExit(f'obsolete gettext strings: pot={extra_pot} po={extra_po}')
+
+core = (root / 'ipregion/files/usr/share/ipregion/ipregion.uc').read_text(encoding='utf-8')
+ipregion_makefile = (root / 'ipregion/Makefile').read_text(encoding='utf-8')
+luci_makefile = (root / 'luci-app-ipregion/Makefile').read_text(encoding='utf-8')
+pkg_version = re.search(r'^PKG_VERSION:=(.+)$', ipregion_makefile, re.MULTILINE).group(1)
+pkg_release = re.search(r'^PKG_RELEASE:=(.+)$', ipregion_makefile, re.MULTILINE).group(1)
+runtime_version = re.search(r"^const VERSION = '([^']+)';$", core, re.MULTILINE).group(1)
+if runtime_version != f'{pkg_version}-{pkg_release}':
+    raise SystemExit(f'runtime/package version mismatch: {runtime_version} != {pkg_version}-{pkg_release}')
+if f'PKG_VERSION:={pkg_version}' not in luci_makefile or f'PKG_RELEASE:={pkg_release}' not in luci_makefile:
+    raise SystemExit('LuCI and core package versions differ')
+if f'ipregion (>={pkg_version}-r{pkg_release})' not in luci_makefile:
+    raise SystemExit('LuCI core dependency does not match the package version')
+
+dns_transports = "[ 'all', 'plain', 'udp', 'tcp', 'both', 'doh', 'dot' ]"
+rpcd = (root / 'luci-app-ipregion/root/usr/share/rpcd/ucode/ipregion.uc').read_text(encoding='utf-8')
+if f'const VALID_DNS_TRANSPORTS = {dns_transports};' not in core or core.count("dns_transport: 'all'") != 1:
+    raise SystemExit('CLI DNS transport enum or default is out of sync')
+if rpcd.count(dns_transports) != 2 or "'all');" not in rpcd:
+    raise SystemExit('rpcd DNS transport enum or default is out of sync')
 
 install_sh = (root / 'install.sh').read_text(encoding='utf-8')
 install_ipk = (root / 'install-ipk.sh').read_text(encoding='utf-8')

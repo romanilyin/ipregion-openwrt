@@ -3,10 +3,10 @@
 include $(TOPDIR)/rules.mk
 
 PKG_VERSION:=2026.9.1
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 LUCI_TITLE:=LuCI support for IPRegion
 LUCI_DEPENDS:=+ipregion +luci-base +rpcd +rpcd-mod-ucode
-LUCI_EXTRA_DEPENDS:=ipregion (>=2026.9.1-r1)
+LUCI_EXTRA_DEPENDS:=ipregion (>=2026.9.1-r2)
 LUCI_PKGARCH:=all
 PKG_LICENSE:=MIT
 PKG_MAINTAINER:=Roman Ilyin <https://github.com/romanilyin>

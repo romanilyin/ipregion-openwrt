@@ -530,8 +530,8 @@ function normalized_ai_options(input) {
 
 function normalized_dns_options(input) {
 	let options = normalized_options(input);
-	let transport = valid_enum(input && input.transport, [ 'both', 'doh', 'dot' ], 'both');
-	let transport_valid = !input || input.transport == null || valid_enum(input.transport, [ 'both', 'doh', 'dot' ], null) != null;
+	let transport = valid_enum(input && input.transport, [ 'all', 'plain', 'udp', 'tcp', 'both', 'doh', 'dot' ], 'all');
+	let transport_valid = !input || input.transport == null || valid_enum(input.transport, [ 'all', 'plain', 'udp', 'tcp', 'both', 'doh', 'dot' ], null) != null;
 	let raw_type = input && input.type != null ? input.type : 'A';
 	let query_type = valid_enum(upper_ascii(raw_type), [ 'A', 'AAAA' ], 'A');
 	let type_valid = (!input || input.type == null || type(input.type) == 'string') && valid_enum(upper_ascii(raw_type), [ 'A', 'AAAA' ], null) != null;
@@ -911,7 +911,7 @@ const methods = {
 
 	dns_result: {
 		call: function(req) {
-			return read_json_file(DNS_RESULT_FILE, { version: 1, mode: 'dns', probes: [], summary: { status: 'ok', findings: [], finding_details: [] }, errors: [] });
+			return read_json_file(DNS_RESULT_FILE, { version: 2, mode: 'dns', probes: [], summary: { status: 'ok', passed: 0, failed: 0, udp_passed: 0, tcp_passed: 0, doh_passed: 0, dot_passed: 0, findings: [], finding_details: [], interception: { status: 'not_run', compared_pairs: 0, likely_pairs: 0, inconclusive_pairs: 0, details: [] } }, errors: [] });
 		}
 	},
 

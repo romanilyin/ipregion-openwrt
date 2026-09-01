@@ -4,7 +4,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=ipregion
 PKG_VERSION:=2026.9.1
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 PKG_LICENSE:=MIT
 PKG_MAINTAINER:=Roman Ilyin <https://github.com/romanilyin>
 
@@ -20,7 +20,7 @@ define Package/ipregion
 endef
 
 define Package/ipregion/description
-  Checks router region, service endpoints and authenticated DoH/DoT availability.
+  Checks router region, services and UDP/TCP/DoH/DoT DNS response integrity.
 endef
 
 define Build/Compile

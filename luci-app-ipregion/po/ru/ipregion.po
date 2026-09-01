@@ -28,9 +28,6 @@ msgstr "Категория AI"
 msgid "AI provider check started"
 msgstr "Проверка AI-провайдеров запущена"
 
-msgid "AI provider checks use the same IP mode, interface, proxy and timeout controls above."
-msgstr "AI-проверки используют выбранные выше режим IP, интерфейс, прокси и таймаут."
-
 msgid "AI provider endpoint results"
 msgstr "Результаты endpoint-ов AI-провайдеров"
 
@@ -46,9 +43,6 @@ msgstr "Авто"
 msgid "Auto-detect reference country"
 msgstr "Автоопределить реальную страну"
 
-msgid "Cache TTL"
-msgstr "TTL кэша"
-
 msgid "CDN services"
 msgstr "CDN-сервисы"
 
@@ -57,9 +51,6 @@ msgstr "CDN-сервисы проверяют, до какого CDN edge или
 
 msgid "Category"
 msgstr "Категория"
-
-msgid "Check how GeoIP, streaming and CDN services detect this router."
-msgstr "Проверяет, как GeoIP, стриминговые и CDN-сервисы видят этот роутер."
 
 msgid "Check how GeoIP, streaming, CDN and AI services detect this router."
 msgstr "Проверяет, как GeoIP, стриминговые, CDN и AI-сервисы видят этот роутер."
@@ -70,17 +61,11 @@ msgstr "Проверять обнаруженный IP"
 msgid "Check service-visible route"
 msgstr "Проверять маршрут глазами сервиса"
 
-msgid "Check whether popular AI API endpoints are reachable through this router, interface or SOCKS5 proxy."
-msgstr "Проверяет, доступны ли популярные AI API endpoint-ы через этот роутер, интерфейс или SOCKS5-прокси."
-
 msgid "Check whether popular AI API endpoints are reachable through the selected route."
 msgstr "Проверяет, доступны ли популярные AI API endpoint-ы через выбранный маршрут."
 
 msgid "China and Asia AI providers"
 msgstr "AI-провайдеры Китая и Азии"
-
-msgid "Clear cache"
-msgstr "Очистить кэш"
 
 msgid "Close"
 msgstr "Закрыть"
@@ -114,9 +99,6 @@ msgstr "Скачать JSON"
 
 msgid "Diagnosis"
 msgstr "Диагностика"
-
-msgid "Enable"
-msgstr "Включить"
 
 msgid "Each row checks the actual provider endpoint domain. With split routing, this can differ from the generic egress check below."
 msgstr "Каждая строка проверяет реальный домен endpoint-а провайдера. При split routing это может отличаться от общей проверки исходящего IP ниже."
@@ -163,9 +145,6 @@ msgstr "IP Region"
 msgid "IP Region check started"
 msgstr "Проверка IP Region запущена"
 
-msgid "IP"
-msgstr "IP"
-
 msgid "ISO 3166-1 alpha-2 country code used to highlight country values. Matching countries are orange; different countries are blue."
 msgstr "Двухбуквенный код страны ISO 3166-1 alpha-2 для подсветки значений стран. Совпадающие страны будут оранжевыми, отличающиеся - синими."
 
@@ -202,9 +181,6 @@ msgstr "Только IPv6"
 msgid "IPv6 value/status"
 msgstr "IPv6 значение/статус"
 
-msgid "Keep logs"
-msgstr "Сохранять логи"
-
 msgid "Last check"
 msgstr "Последняя проверка"
 
@@ -222,9 +198,6 @@ msgstr "Лог пуст"
 
 msgid "Mask IP addresses in UI"
 msgstr "Маскировать IP-адреса в UI"
-
-msgid "Max parallel checks"
-msgstr "Максимум параллельных проверок"
 
 msgid "N/A"
 msgstr "Н/Д"
@@ -300,9 +273,6 @@ msgstr "Лог выполнения"
 
 msgid "Runtime state"
 msgstr "Состояние выполнения"
-
-msgid "Saved SOCKS5 proxy"
-msgstr "Сохраненный SOCKS5-прокси"
 
 msgid "Safe mode is used by default. It does not store API keys and only checks whether provider endpoint domains are reachable through their selected routes."
 msgstr "По умолчанию используется безопасный режим. Он не хранит API-ключи и только проверяет доступность доменов endpoint-ов провайдеров через выбранные для них маршруты."
@@ -406,20 +376,11 @@ msgstr "Задайте сохраненный SOCKS5 proxy в настройка
 msgid "Use saved SOCKS5 proxy"
 msgstr "Использовать сохраненный SOCKS5 proxy"
 
-msgid "A successful encrypted DNS check does not prove that ordinary UDP or TCP port 53 is free from interception."
-msgstr "Успешная проверка зашифрованного DNS не доказывает отсутствие перехвата обычного UDP или TCP на порту 53."
-
 msgid "Answer"
 msgstr "Ответ"
 
-msgid "Check whether major public DNS resolvers are reachable over authenticated DoH and DoT connections."
-msgstr "Проверяет доступность основных публичных DNS-резолверов через аутентифицированные соединения DoH и DoT."
-
 msgid "DNS Security"
 msgstr "Безопасность DNS"
-
-msgid "DNS checks use the IP mode, interface and timeout controls above. DoH binds to the selected interface; DoT binds to its source address. SOCKS5 proxy routing is not used."
-msgstr "DNS-проверки используют выбранные выше режим IP, интерфейс и таймаут. DoH привязывается к выбранному интерфейсу, а DoT - к его исходному адресу. SOCKS5-прокси не применяется."
 
 msgid "DNS provider"
 msgstr "DNS-провайдер"
@@ -438,24 +399,6 @@ msgstr "Сводка безопасности DNS"
 
 msgid "DNS status"
 msgstr "Статус DNS"
-
-msgid "DoH and DoT"
-msgstr "DoH и DoT"
-
-msgid "DoH and DoT connect directly to published resolver IP addresses and verify the provider TLS hostname."
-msgstr "DoH и DoT подключаются напрямую к опубликованным IP-адресам резолвера и проверяют TLS-имя провайдера."
-
-msgid "DoH only"
-msgstr "Только DoH"
-
-msgid "DoT only"
-msgstr "Только DoT"
-
-msgid "Encrypted DNS results"
-msgstr "Результаты зашифрованного DNS"
-
-msgid "Encrypted DNS transport"
-msgstr "Транспорт зашифрованного DNS"
 
 msgid "Endpoint"
 msgstr "Endpoint"
@@ -544,8 +487,8 @@ msgstr "не прошел проверку сертификата; провер�
 msgid "TLS handshake failed."
 msgstr "не смог установить TLS-соединение."
 
-msgid "TCP connection failed or was reset."
-msgstr "не смог установить TCP-соединение или соединение было сброшено."
+msgid "Connection failed or was reset."
+msgstr "не смог установить соединение или соединение было сброшено."
 
 msgid "DoH returned an HTTP error."
 msgstr "DoH вернул ошибку HTTP."
@@ -601,5 +544,65 @@ msgstr "Неизвестная ошибка"
 msgid "No DNS providers matched the requested filters"
 msgstr "Нет DNS-провайдеров, соответствующих выбранным фильтрам"
 
-msgid "kdig is required for DNS-over-TLS checks"
-msgstr "Для проверок DNS-over-TLS требуется kdig"
+msgid "No selected DNS provider supports the requested transport"
+msgstr "Ни один выбранный DNS-провайдер не поддерживает запрошенный транспорт"
+
+msgid "Truncated"
+msgstr "Усеченный ответ"
+
+msgid "returned a valid direct DNS response."
+msgstr "вернул корректный прямой DNS-ответ."
+
+msgid "The UDP response was truncated and was not retried over TCP."
+msgstr "UDP-ответ был усечен и не повторялся автоматически через TCP."
+
+msgid "UDP/53 is unavailable."
+msgstr "UDP/53 недоступен."
+
+msgid "TCP/53 is unavailable."
+msgstr "TCP/53 недоступен."
+
+msgid "Plain and authenticated DNS returned different answers; resolver or CDN variation may be legitimate."
+msgstr "Открытый и аутентифицированный DNS вернули разные ответы; это может быть допустимой вариацией резолвера или CDN."
+
+msgid "UDP/53 returned a different DNS response code while TCP/53 matched authenticated DNS; UDP interception is likely."
+msgstr "UDP/53 вернул другой код DNS-ответа, а TCP/53 совпал с аутентифицированным DNS; вероятен перехват UDP."
+
+msgid "TCP/53 returned a different DNS response code while UDP/53 matched authenticated DNS; TCP interception is likely."
+msgstr "TCP/53 вернул другой код DNS-ответа, а UDP/53 совпал с аутентифицированным DNS; вероятен перехват TCP."
+
+msgid "UDP/53 and TCP/53 agree with each other but differ from authenticated DNS; plain DNS interception is likely."
+msgstr "UDP/53 и TCP/53 совпали между собой, но отличаются от аутентифицированного DNS; вероятен перехват открытого DNS."
+
+msgid "Likely DNS interception"
+msgstr "Вероятен перехват DNS"
+
+msgid "No DNS response mismatch detected"
+msgstr "Расхождений DNS-ответов не обнаружено"
+
+msgid "Interception check inconclusive"
+msgstr "Проверка перехвата не дала однозначного результата"
+
+msgid "Interception comparison pending"
+msgstr "Сравнение на перехват выполняется"
+
+msgid "Interception comparison not run"
+msgstr "Сравнение на перехват не выполнялось"
+
+msgid "kdig is required for UDP, TCP and DNS-over-TLS checks"
+msgstr "Для проверок UDP, TCP и DNS-over-TLS требуется kdig"
+
+msgid "DNS results"
+msgstr "Результаты DNS"
+
+msgid "One run checks direct UDP/53, TCP/53, DoH and DoT responses in the same table. TLS hostnames are verified for encrypted transports."
+msgstr "Один запуск проверяет прямые ответы UDP/53, TCP/53, DoH и DoT в общей таблице. Для зашифрованных транспортов проверяются TLS-имена."
+
+msgid "The single DNS run checks UDP/53, TCP/53, DoH and DoT using the IP mode, interface and timeout controls above. SOCKS5 proxy routing is not used."
+msgstr "Единый DNS-запуск проверяет UDP/53, TCP/53, DoH и DoT с выбранными выше режимом IP, интерфейсом и таймаутом. Маршрутизация через SOCKS5-прокси не используется."
+
+msgid "Matching responses mean no mismatch was detected; they do not prove that interception is absent."
+msgstr "Совпадающие ответы означают только отсутствие обнаруженных расхождений, но не доказывают отсутствие перехвата."
+
+msgid "Compare UDP/53, TCP/53, DoH and DoT responses from public and active-interface DNS resolvers in one check."
+msgstr "Сравнивает ответы UDP/53, TCP/53, DoH и DoT от публичных DNS и DNS активного интерфейса в одной проверке."
