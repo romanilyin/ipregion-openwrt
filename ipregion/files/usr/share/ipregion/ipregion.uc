@@ -5,12 +5,14 @@
 import * as fs from 'fs';
 import { cursor } from 'uci';
 
-const VERSION = '2026.5.28-1';
+const VERSION = '2026.9.1-1';
 const CATALOG_PATH = getenv('IPREGION_CATALOG_PATH') || '/usr/share/ipregion/services.json';
 const AI_CATALOG_PATH = getenv('IPREGION_AI_CATALOG_PATH') || '/usr/share/ipregion/services-ai.json';
+const DNS_CATALOG_PATH = getenv('IPREGION_DNS_CATALOG_PATH') || '/usr/share/ipregion/services-dns.json';
 const RUNTIME_DIR = getenv('IPREGION_RUNTIME_DIR') || '/tmp/run/ipregion';
 const STATE_FILE = RUNTIME_DIR + '/state.json';
 const AI_STATE_FILE = RUNTIME_DIR + '/ai-state.json';
+const DNS_STATE_FILE = RUNTIME_DIR + '/dns-state.json';
 const DEFAULT_CONFIG = '/etc/config/ipregion';
 const USER_AGENT = 'Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0';
 
@@ -41,11 +43,29 @@ const AI_STATUS_LABELS = {
 	unavailable: 'Unavailable'
 };
 
+const DNS_STATUS_LABELS = {
+	ok: 'OK',
+	degraded: 'Degraded',
+	timeout: 'Timeout',
+	connection_failed: 'Connection failed',
+	tls_failed: 'TLS failed',
+	certificate_failed: 'Certificate failed',
+	http_failed: 'HTTP failed',
+	dns_nxdomain: 'NXDOMAIN',
+	dns_servfail: 'SERVFAIL',
+	dns_error: 'DNS error',
+	no_answer: 'No answer',
+	malformed_response: 'Malformed response',
+	unavailable: 'Unavailable'
+};
+
 const VALID_GROUPS = [ 'all', 'primary', 'custom', 'cdn' ];
 const VALID_IP_MODES = [ 'auto', 'ipv4', 'ipv6', 'both' ];
 const VALID_PROXY_DNS = [ 'local', 'remote' ];
 const VALID_AI_CATEGORIES = [ 'all', 'ai', 'ai_china' ];
 const VALID_GEOIP_MODES = [ 'lookup', 'route' ];
+const VALID_DNS_TRANSPORTS = [ 'both', 'doh', 'dot' ];
+const VALID_DNS_TYPES = [ 'A', 'AAAA' ];
 const IDENTITY_ENDPOINTS = [
 	'https://api64.ipify.org',
 	'https://ifconfig.co/ip',
@@ -61,8 +81,9 @@ const DISNEY_PLUS_JSON_BODY = '{"query":"\n     mutation registerDevice($registe
 function usage() {
 	return 'Usage: ipregion [OPTIONS]\n' +
 		'       ipregion ai [OPTIONS]\n' +
+		'       ipregion dns [OPTIONS]\n' +
 		'\n' +
-		'IPRegion checks how GeoIP, streaming, CDN and AI endpoints see this route.\n' +
+		'IPRegion checks route regions, service endpoints and encrypted DNS availability.\n' +
 		'\n' +
 		'Options:\n' +
 		'  -h, --help                 Show this help message\n' +
@@ -82,10 +103,14 @@ function usage() {
 		'      --lock FILE            Accepted for future locking; not enforced yet\n' +
 		'      --list-services        List service catalog\n' +
 		'      --list-ai-providers    List AI provider catalog\n' +
+		'      --list-dns-providers   List encrypted DNS provider catalog\n' +
 		'      --service SERVICE_ID   Run only selected service, repeatable\n' +
 		'      --exclude SERVICE_ID   Exclude service, repeatable\n' +
 		'      --provider PROVIDER    AI mode: run one provider, repeatable\n' +
 		'      --category CATEGORY    AI mode: all, ai, or ai_china\n' +
+		'      --transport TRANSPORT  DNS mode: both, doh, or dot\n' +
+		'      --dns-name NAME        DNS mode: validated query name\n' +
+		'      --dns-type TYPE        DNS mode: A or AAAA\n' +
 		'      --safe                 AI mode: unauthenticated endpoint probe\n' +
 		'      --auth-check           AI mode: use API keys from environment\n' +
 		'      --compat-json          Output legacy-compatible result schema\n' +
@@ -198,6 +223,25 @@ function read_ai_catalog() {
 	}
 }
 
+function read_dns_catalog() {
+	let data = fs.readfile(DNS_CATALOG_PATH);
+
+	if (data == null)
+		die('cannot read DNS provider catalog: ' + DNS_CATALOG_PATH, 1);
+
+	try {
+		let catalog = json(data);
+
+		if (type(catalog) != 'object' || type(catalog.providers) != 'array')
+			die('invalid DNS provider catalog: ' + DNS_CATALOG_PATH, 1);
+
+		return catalog;
+	}
+	catch (e) {
+		die('invalid DNS provider catalog JSON: ' + DNS_CATALOG_PATH, 1);
+	}
+}
+
 function default_options() {
 	return {
 		json: false,
@@ -217,6 +261,7 @@ function default_options() {
 		lock: null,
 		list_services: false,
 		list_ai_providers: false,
+		list_dns_providers: false,
 		self_test: false,
 		no_uci: false,
 		compat_json: false,
@@ -226,6 +271,10 @@ function default_options() {
 		ai_category: 'all',
 		auth_check: false,
 		ai_providers: [],
+		dns_transport: 'both',
+		dns_name: null,
+		dns_type: 'A',
+		dns_providers: [],
 		services: [],
 		exclude: []
 	};
@@ -250,6 +299,10 @@ function parse_args(argv) {
 
 		case 'ai':
 			opts.mode = 'ai';
+			break;
+
+		case 'dns':
+			opts.mode = 'dns';
 			break;
 
 		case '-j':
@@ -349,6 +402,10 @@ function parse_args(argv) {
 			opts.list_ai_providers = true;
 			break;
 
+		case '--list-dns-providers':
+			opts.list_dns_providers = true;
+			break;
+
 		case '--service':
 			push(opts.services, validate_token(require_value(argv, i, arg), 'service id'));
 			i++;
@@ -360,12 +417,31 @@ function parse_args(argv) {
 			break;
 
 		case '--provider':
-			push(opts.ai_providers, validate_token(require_value(argv, i, arg), 'provider id'));
+			let provider_id = validate_token(require_value(argv, i, arg), 'provider id');
+			if (opts.mode == 'dns')
+				push(opts.dns_providers, provider_id);
+			else
+				push(opts.ai_providers, provider_id);
 			i++;
 			break;
 
 		case '--category':
 			opts.ai_category = require_value(argv, i, arg);
+			i++;
+			break;
+
+		case '--transport':
+			opts.dns_transport = require_value(argv, i, arg);
+			i++;
+			break;
+
+		case '--dns-name':
+			opts.dns_name = require_value(argv, i, arg);
+			i++;
+			break;
+
+		case '--dns-type':
+			opts.dns_type = upper_ascii(require_value(argv, i, arg));
 			i++;
 			break;
 
@@ -428,7 +504,7 @@ function apply_uci_config(opts) {
 	if (!seen.geoip_mode && cfg.geoip_mode != null) opts.geoip_mode = cfg.geoip_mode;
 	if (!seen.timeout && cfg.timeout != null) opts.timeout = parse_int_range(cfg.timeout, 'timeout', 1, 60);
 	if (!seen.retries && cfg.retries != null) opts.retries = parse_int_range(cfg.retries, 'retries', 0, 5);
-	if (!seen.proxy && cfg.proxy != null && cfg.proxy != '') opts.proxy = cfg.proxy;
+	if (opts.mode != 'dns' && !seen.proxy && cfg.proxy != null && cfg.proxy != '') opts.proxy = cfg.proxy;
 	if (!seen.proxy_dns && cfg.proxy_dns != null) opts.proxy_dns = cfg.proxy_dns;
 	if (!seen.interface && cfg.interface != null && cfg.interface != '') opts.interface = validate_token(cfg.interface, 'interface');
 	if (!seen.debug && cfg.debug != null) opts.debug = cfg.debug == '1';
@@ -449,6 +525,21 @@ function apply_uci_config(opts) {
 	}
 
 	return opts;
+}
+
+function valid_dns_name(value) {
+	value = trim_str(value || '');
+	if (length(value) < 1 || length(value) > 253 || !match(value, /^[A-Za-z0-9.-]+$/) || index(value, '..') >= 0)
+		return false;
+
+	if (substr(value, length(value) - 1) == '.')
+		value = substr(value, 0, length(value) - 1);
+
+	for (let label in split(value, '.'))
+		if (length(label) < 1 || length(label) > 63 || substr(label, 0, 1) == '-' || substr(label, length(label) - 1) == '-')
+			return false;
+
+	return true;
 }
 
 function validate_options(opts) {
@@ -493,6 +584,21 @@ function validate_options(opts) {
 
 	if (!contains(VALID_AI_CATEGORIES, opts.ai_category))
 		die('invalid AI provider category: ' + opts.ai_category, 2);
+
+	if (!contains(VALID_DNS_TRANSPORTS, opts.dns_transport))
+		die('invalid DNS transport: ' + opts.dns_transport, 2);
+
+	if (!contains(VALID_DNS_TYPES, opts.dns_type))
+		die('invalid DNS query type: ' + opts.dns_type, 2);
+
+	if (opts.dns_name != null) {
+		opts.dns_name = trim_str(opts.dns_name);
+		if (!valid_dns_name(opts.dns_name))
+			die('invalid DNS query name: ' + opts.dns_name, 2);
+	}
+
+	if (opts.mode == 'dns' && opts.proxy != null)
+		die('DNS mode does not support SOCKS5 proxy routing', 2);
 }
 
 function service_exists(catalog, id) {
@@ -517,6 +623,20 @@ function validate_ai_provider_ids(catalog, ids) {
 	for (let i = 0; i < length(ids); i++)
 		if (!ai_provider_exists(catalog, ids[i]))
 			die('unknown AI provider id: ' + ids[i], 2);
+}
+
+function dns_provider_exists(catalog, id) {
+	for (let provider in catalog.providers)
+		if (provider.id == id)
+			return true;
+
+	return false;
+}
+
+function validate_dns_provider_ids(catalog, ids) {
+	for (let i = 0; i < length(ids); i++)
+		if (!dns_provider_exists(catalog, ids[i]))
+			die('unknown DNS provider id: ' + ids[i], 2);
 }
 
 function contains_number(list, value) {
@@ -1650,6 +1770,659 @@ function update_ai_state(state) {
 	atomic_write(AI_STATE_FILE, sprintf('%J\n', merge_object(read_json_file(AI_STATE_FILE, {}), state)));
 }
 
+function update_dns_state(state) {
+	fs.mkdir(RUNTIME_DIR);
+	atomic_write(DNS_STATE_FILE, sprintf('%J\n', merge_object(read_json_file(DNS_STATE_FILE, {}), state)));
+}
+
+function dns_u16(data, offset) {
+	if (offset < 0 || offset + 1 >= length(data))
+		return null;
+
+	return (ord(data, offset) << 8) | ord(data, offset + 1);
+}
+
+function dns_u32(data, offset) {
+	let hi = dns_u16(data, offset);
+	let lo = dns_u16(data, offset + 2);
+	return hi == null || lo == null ? null : (hi * 65536) + lo;
+}
+
+function dns_encode_name(name) {
+	let out = '';
+	name = rtrim(trim_str(name), '.');
+
+	for (let label in split(name, '.'))
+		out += chr(length(label)) + label;
+
+	return out + chr(0);
+}
+
+function dns_query_message(name, query_type, id) {
+	let type_id = query_type == 'AAAA' ? 28 : 1;
+	return chr((id >> 8) & 255) + chr(id & 255) +
+		chr(1) + chr(0) + chr(0) + chr(1) +
+		chr(0) + chr(0) + chr(0) + chr(0) + chr(0) + chr(0) +
+		dns_encode_name(name) + chr(0) + chr(type_id) + chr(0) + chr(1);
+}
+
+function dns_base64url(value) {
+	let encoded = b64enc(value);
+	encoded = replace(encoded, '+', '-');
+	encoded = replace(encoded, '/', '_');
+	return replace(encoded, '=', '');
+}
+
+function dns_read_name(data, offset) {
+	let labels = [];
+	let next_offset = offset;
+	let jumped = false;
+	let steps = 0;
+
+	while (offset < length(data) && steps++ < 128) {
+		let size = ord(data, offset);
+
+		if (size == 0) {
+			if (!jumped)
+				next_offset = offset + 1;
+			return { name: length(labels) ? join('.', labels) + '.' : '.', next: next_offset };
+		}
+
+		if ((size & 192) == 192) {
+			let pointer = dns_u16(data, offset);
+			if (pointer == null)
+				return null;
+
+			pointer &= 16383;
+			if (pointer >= length(data))
+				return null;
+
+			if (!jumped)
+				next_offset = offset + 2;
+			offset = pointer;
+			jumped = true;
+			continue;
+		}
+
+		if (size > 63 || offset + 1 + size > length(data))
+			return null;
+
+		push(labels, substr(data, offset + 1, size));
+		offset += size + 1;
+		if (!jumped)
+			next_offset = offset;
+	}
+
+	return null;
+}
+
+function dns_ipv4(data, offset) {
+	return sprintf('%d.%d.%d.%d', ord(data, offset), ord(data, offset + 1), ord(data, offset + 2), ord(data, offset + 3));
+}
+
+function dns_ipv6(data, offset) {
+	let groups = [];
+	for (let i = 0; i < 16; i += 2)
+		push(groups, sprintf('%x', dns_u16(data, offset + i)));
+	return join(':', groups);
+}
+
+function dns_rcode_name(rcode) {
+	switch (rcode) {
+	case 0: return 'NOERROR';
+	case 1: return 'FORMERR';
+	case 2: return 'SERVFAIL';
+	case 3: return 'NXDOMAIN';
+	case 4: return 'NOTIMP';
+	case 5: return 'REFUSED';
+	default: return 'RCODE' + rcode;
+	}
+}
+
+function parse_dns_message(data, expected_id, expected_name, expected_type) {
+	if (data == null || length(data) < 12)
+		return { error: 'DNS response is shorter than its header' };
+
+	let id = dns_u16(data, 0);
+	let flags = dns_u16(data, 2);
+	let question_count = dns_u16(data, 4);
+	let answer_count = dns_u16(data, 6);
+	let authority_count = dns_u16(data, 8);
+	let additional_count = dns_u16(data, 10);
+	if (id != expected_id || (flags & 32768) == 0)
+		return { error: id != expected_id ? 'DNS transaction id mismatch' : 'DNS response flag is missing' };
+
+	let offset = 12;
+	let question_name = null;
+	let question_type = null;
+	for (let i = 0; i < question_count; i++) {
+		let question = dns_read_name(data, offset);
+		if (question == null || question.next + 4 > length(data))
+			return { error: 'Malformed DNS question section' };
+		offset = question.next;
+		if (i == 0) {
+			question_name = question.name;
+			question_type = dns_u16(data, offset);
+		}
+		offset += 4;
+	}
+
+	let wanted_name = lc(rtrim(expected_name, '.') + '.');
+	let wanted_type = expected_type == 'AAAA' ? 28 : 1;
+	if (lc(question_name || '') != wanted_name || question_type != wanted_type)
+		return { error: 'DNS question does not match the request' };
+
+	let address_answers = [];
+	let aliases = [];
+	for (let i = 0; i < answer_count; i++) {
+		let owner = dns_read_name(data, offset);
+		if (owner == null || owner.next + 10 > length(data))
+			return { error: 'Malformed DNS answer section' };
+
+		offset = owner.next;
+		let type_id = dns_u16(data, offset);
+		let class_id = dns_u16(data, offset + 2);
+		let ttl = dns_u32(data, offset + 4);
+		let data_length = dns_u16(data, offset + 8);
+		let data_offset = offset + 10;
+		if (data_length == null || data_offset + data_length > length(data))
+			return { error: 'Malformed DNS record data' };
+
+		let value = null;
+		let type_name = 'TYPE' + type_id;
+		if (class_id == 1 && type_id == wanted_type && type_id == 1 && data_length == 4) {
+			type_name = 'A';
+			value = dns_ipv4(data, data_offset);
+		}
+		else if (class_id == 1 && type_id == wanted_type && type_id == 28 && data_length == 16) {
+			type_name = 'AAAA';
+			value = dns_ipv6(data, data_offset);
+		}
+
+		if (value != null) {
+			push(address_answers, {
+				owner: lc(rtrim(owner.name, '.') + '.'),
+				answer: { name: owner.name, type: type_name, value: value, ttl: ttl, class: class_id }
+			});
+		}
+		else if (class_id == 1 && type_id == 5) {
+			let target = dns_read_name(data, data_offset);
+			if (target == null || target.next != data_offset + data_length)
+				return { error: 'Malformed CNAME record data' };
+			push(aliases, {
+				owner: lc(rtrim(owner.name, '.') + '.'),
+				target: lc(rtrim(target.name, '.') + '.')
+			});
+		}
+
+		offset = data_offset + data_length;
+	}
+	let valid_names = [ wanted_name ];
+	for (let i = 0; i < length(aliases); i++) {
+		let changed = false;
+		for (let alias in aliases)
+			if (contains(valid_names, alias.owner) && !contains(valid_names, alias.target)) {
+				push(valid_names, alias.target);
+				changed = true;
+			}
+		if (!changed)
+			break;
+	}
+	let answers = [];
+	for (let candidate in address_answers)
+		if (contains(valid_names, candidate.owner))
+			push(answers, candidate.answer);
+
+	let rcode = flags & 15;
+	return {
+		id: id,
+		rcode: rcode,
+		rcode_name: dns_rcode_name(rcode),
+		ad: (flags & 32) != 0,
+		ra: (flags & 128) != 0,
+		question: { name: question_name, type: expected_type },
+		answers: answers,
+		counts: { question: question_count, answer: answer_count, authority: authority_count, additional: additional_count }
+	};
+}
+
+function dns_status_for_response(response) {
+	if (response.error != null)
+		return 'malformed_response';
+	if (response.rcode == 3)
+		return 'dns_nxdomain';
+	if (response.rcode == 2)
+		return 'dns_servfail';
+	if (response.rcode != 0)
+		return 'dns_error';
+	return length(response.answers || []) ? 'ok' : 'no_answer';
+}
+
+function dns_network_status(exit_code, output) {
+	output = lc(output || '');
+	if (exit_code == 28 || index(output, 'timeout') >= 0 || index(output, 'timed out') >= 0)
+		return 'timeout';
+	if (exit_code == 60 || index(output, 'certificate') >= 0 || index(output, 'not trusted') >= 0)
+		return 'certificate_failed';
+	if (exit_code == 35 || index(output, 'tls') >= 0)
+		return 'tls_failed';
+	return 'connection_failed';
+}
+
+function dns_diagnosis(status, transport) {
+	switch (status) {
+	case 'ok': return transport + ' returned a valid authenticated DNS response.';
+	case 'degraded': return transport + ' succeeded through a fallback resolver address.';
+	case 'timeout': return transport + ' did not respond before timeout; the endpoint or transport may be dropped.';
+	case 'certificate_failed': return transport + ' certificate validation failed; check system time or possible TLS interception.';
+	case 'tls_failed': return transport + ' TLS handshake failed.';
+	case 'connection_failed': return transport + ' TCP connection failed or was reset.';
+	case 'http_failed': return 'DoH returned an HTTP error.';
+	case 'dns_nxdomain': return 'The resolver returned NXDOMAIN for the probe name.';
+	case 'dns_servfail': return 'The resolver returned SERVFAIL for the probe name.';
+	case 'dns_error': return 'The resolver returned a DNS error response.';
+	case 'no_answer': return 'The resolver returned NOERROR without a usable answer.';
+	case 'malformed_response': return 'The endpoint returned a malformed or mismatched DNS response.';
+	default: return 'The requested DNS transport is unavailable.';
+	}
+}
+
+function dns_transport_label(transport) {
+	return transport == 'doh' ? 'DoH' : 'DoT';
+}
+
+function dns_row(provider, transport, ip_version, endpoint, status, response, latency_ms, attempts, detail) {
+	return {
+		id: provider.id,
+		name: provider.name || provider.id,
+		row_id: provider.id + '-' + transport + '-ipv' + ip_version,
+		transport: transport,
+		transport_label: dns_transport_label(transport),
+		ip_version: ip_version,
+		ip_label: 'IPv' + ip_version,
+		endpoint: endpoint,
+		status: status,
+		label: DNS_STATUS_LABELS[status] || status,
+		tls_verified: status != 'tls_failed' && status != 'certificate_failed' && status != 'connection_failed' && status != 'timeout' && status != 'unavailable',
+		rcode: response && response.rcode_name || null,
+		ad: response && response.ad == true,
+		answers: response && response.answers || [],
+		latency_ms: latency_ms,
+		attempts: attempts || [],
+		detail: detail || null,
+		diagnosis: dns_diagnosis(status, dns_transport_label(transport))
+	};
+}
+
+function dns_endpoint_addresses(provider, ip_version) {
+	let addresses = ip_version == 6 ? provider.ipv6 : provider.ipv4;
+	return type(addresses) == 'array' ? addresses : [];
+}
+
+function curl_doh_probe(provider, opts, ip_version, endpoint, name, query_type) {
+	let nonce = clock(true);
+	let query_id = (time() + int(type(nonce) == 'array' ? nonce[1] / 1000000 : 0)) & 65535;
+	let query = dns_base64url(dns_query_message(name, query_type, query_id));
+	let suffix = type(nonce) == 'array' ? nonce[0] + '.' + nonce[1] : time();
+	let response_file = RUNTIME_DIR + '/doh-' + provider.id + '-' + ip_version + '-' + suffix + '.bin';
+	let resolve_address = index(endpoint, ':') >= 0 ? '[' + endpoint + ']' : endpoint;
+	let args = [
+		'curl', '--disable', '--silent', '--show-error', '--request', 'GET',
+		'--noproxy', '*',
+		'--header', 'Accept: application/dns-message',
+		'--connect-timeout', '' + opts.timeout,
+		'--max-time', '' + opts.timeout,
+		'--output', response_file,
+		'--resolve', provider.doh_hostname + ':443:' + resolve_address,
+		'--write-out', '\n__IPREGION_HTTP_CODE:%{http_code}\n__IPREGION_REMOTE_IP:%{remote_ip}\n__IPREGION_TIME_CONNECT:%{time_connect}\n__IPREGION_TIME_APPCONNECT:%{time_appconnect}\n__IPREGION_TIME_TOTAL:%{time_total}'
+	];
+
+	push(args, ip_version == 6 ? '-6' : '-4');
+	if (opts.interface != null)
+		push(args, '--interface', opts.interface);
+	push(args, provider.doh_url + (index(provider.doh_url, '?') >= 0 ? '&' : '?') + 'dns=' + query);
+
+	let quoted = [];
+	for (let arg in args)
+		push(quoted, shell_quote(arg));
+
+	fs.mkdir(RUNTIME_DIR);
+	fs.unlink(response_file);
+	let proc = fs.popen(join(' ', quoted), 'r');
+	let output = proc ? proc.read('all') : '';
+	let exit_code = proc ? proc.close() : 127;
+	let body = fs.readfile(response_file);
+	fs.unlink(response_file);
+	let latency_ms = seconds_marker_ms(output, 'TIME_TOTAL');
+	let http_code = int(marker_value(output, 'HTTP_CODE') || '0');
+
+	if (exit_code != 0)
+		return { status: dns_network_status(exit_code, output), response: null, latency_ms: latency_ms, detail: 'curl exit ' + exit_code, remote_ip: marker_value(output, 'REMOTE_IP') };
+	if (http_code != 200)
+		return { status: 'http_failed', response: null, latency_ms: latency_ms, detail: 'HTTP ' + http_code, remote_ip: marker_value(output, 'REMOTE_IP') };
+
+	let response = parse_dns_message(body, query_id, name, query_type);
+	return { status: dns_status_for_response(response), response: response, latency_ms: latency_ms, detail: response.error || null, remote_ip: marker_value(output, 'REMOTE_IP') };
+}
+
+function kdig_answer_value(record, query_type) {
+	if (query_type == 'AAAA')
+		return record.rdataAAAA ?? null;
+	return record.rdataA ?? null;
+}
+
+function kdig_response(parsed, name, query_type) {
+	let expected_name = lc(rtrim(name, '.') + '.');
+	if (lc(parsed.QNAME || '') != expected_name || parsed.QTYPEname != query_type)
+		return { error: 'DNS question does not match the request' };
+
+	let aliases = [];
+	for (let record in parsed.answerRRs || [])
+		if (record.TYPEname == 'CNAME' && int(record.CLASS) == 1 && record.rdataCNAME != null)
+			push(aliases, {
+				owner: lc(rtrim(record.NAME || '', '.') + '.'),
+				target: lc(rtrim(record.rdataCNAME, '.') + '.')
+			});
+	let valid_names = [ expected_name ];
+	for (let i = 0; i < length(aliases); i++) {
+		let changed = false;
+		for (let alias in aliases)
+			if (contains(valid_names, alias.owner) && !contains(valid_names, alias.target)) {
+				push(valid_names, alias.target);
+				changed = true;
+			}
+		if (!changed)
+			break;
+	}
+
+	let answers = [];
+	for (let record in parsed.answerRRs || []) {
+		let value = kdig_answer_value(record, query_type);
+		let owner = lc(rtrim(record.NAME || '', '.') + '.');
+		if (value != null && record.TYPEname == query_type && int(record.CLASS) == 1 && contains(valid_names, owner))
+			push(answers, { name: record.NAME, type: record.TYPEname || query_type, value: value, ttl: record.TTL, class: record.CLASS });
+	}
+
+	return {
+		rcode: int(parsed.RCODE),
+		rcode_name: dns_rcode_name(int(parsed.RCODE)),
+		ad: parsed.AD == 1,
+		ra: parsed.RA == 1,
+		question: { name: parsed.QNAME, type: parsed.QTYPEname },
+		answers: answers,
+		counts: { question: parsed.QDCOUNT, answer: parsed.ANCOUNT, authority: parsed.NSCOUNT, additional: parsed.ARCOUNT }
+	};
+}
+
+function interface_source_address(interface, ip_version) {
+	if (interface == null)
+		return null;
+
+	let args = [ 'ip', ip_version == 6 ? '-6' : '-4', '-o', 'addr', 'show', 'dev', interface, 'scope', 'global' ];
+	let quoted = [];
+	for (let arg in args)
+		push(quoted, shell_quote(arg));
+	let proc = fs.popen(join(' ', quoted) + ' 2>/dev/null', 'r');
+	let output = proc ? proc.read('all') : '';
+	if (proc) proc.close();
+	let found = match(output, ip_version == 6 ? /inet6 ([0-9A-Fa-f:]+)\// : /inet ([0-9.]+)\//);
+	return found ? found[1] : null;
+}
+
+function interface_routes_endpoint(interface, source, endpoint, ip_version) {
+	let args = [ 'ip', ip_version == 6 ? '-6' : '-4', 'route', 'get', endpoint, 'from', source ];
+	let quoted = [];
+	for (let arg in args)
+		push(quoted, shell_quote(arg));
+	let proc = fs.popen(join(' ', quoted) + ' 2>/dev/null', 'r');
+	let output = proc ? proc.read('all') : '';
+	let exit_code = proc ? proc.close() : 127;
+	output = ' ' + replace(replace(output, '\n', ' '), '\t', ' ') + ' ';
+	return exit_code == 0 && index(output, ' dev ' + interface + ' ') >= 0;
+}
+
+function kdig_dot_probe(provider, opts, ip_version, endpoint, name, query_type) {
+	let args = [
+		'kdig', ip_version == 6 ? '-6' : '-4', '+json', '+tls-ca',
+		'+tls-hostname=' + provider.dot_hostname,
+		'+tls-sni=' + provider.dot_hostname,
+		'+timeout=' + opts.timeout,
+		'+retry=0'
+	];
+	let source = interface_source_address(opts.interface, ip_version);
+	if (opts.interface != null && source == null)
+		return { status: 'unavailable', response: null, latency_ms: null, detail: 'Interface has no IPv' + ip_version + ' address' };
+	if (source != null && !interface_routes_endpoint(opts.interface, source, endpoint, ip_version))
+		return { status: 'unavailable', response: null, latency_ms: null, detail: 'Selected interface is not the route to this endpoint' };
+	if (source != null)
+		push(args, '-b', source);
+	push(args, '@' + endpoint, name, query_type);
+
+	let quoted = [];
+	for (let arg in args)
+		push(quoted, shell_quote(arg));
+	let started = clock(true);
+	let proc = fs.popen(join(' ', quoted) + ' 2>&1', 'r');
+	let output = proc ? proc.read('all') : '';
+	let exit_code = proc ? proc.close() : 127;
+	let ended = clock(true);
+	let latency_ms = type(started) == 'array' && type(ended) == 'array' ? ((ended[0] - started[0]) * 1000) + int((ended[1] - started[1]) / 1000000) : null;
+
+	if (exit_code != 0)
+		return { status: dns_network_status(exit_code, output), response: null, latency_ms: latency_ms, detail: trim_str(output) || 'kdig exit ' + exit_code };
+
+	let parsed = parse_json_safe(output);
+	if (parsed == null)
+		return { status: 'malformed_response', response: null, latency_ms: latency_ms, detail: 'kdig output was not valid JSON' };
+	let response = kdig_response(parsed, name, query_type);
+	return { status: dns_status_for_response(response), response: response, latency_ms: latency_ms, detail: response.error || null };
+}
+
+function dns_status_succeeded(status) {
+	return status == 'ok' || status == 'degraded' || status == 'dns_nxdomain' || status == 'dns_servfail' || status == 'dns_error' || status == 'no_answer';
+}
+
+function probe_dns_transport(provider, transport, opts, ip_version, name, query_type) {
+	let addresses = dns_endpoint_addresses(provider, ip_version);
+	let attempts = [];
+	let last = null;
+	for (let endpoint in addresses) {
+		let attempt = transport == 'doh'
+			? curl_doh_probe(provider, opts, ip_version, endpoint, name, query_type)
+			: kdig_dot_probe(provider, opts, ip_version, endpoint, name, query_type);
+		push(attempts, { endpoint: endpoint, status: attempt.status, detail: attempt.detail || null, latency_ms: attempt.latency_ms });
+		last = attempt;
+		if (dns_status_succeeded(attempt.status)) {
+			let status = length(attempts) > 1 ? 'degraded' : attempt.status;
+			return dns_row(provider, transport, ip_version, endpoint, status, attempt.response, attempt.latency_ms, attempts, attempt.detail);
+		}
+	}
+
+	if (last == null)
+		return dns_row(provider, transport, ip_version, null, 'unavailable', null, null, attempts, 'No endpoint address is configured');
+	return dns_row(provider, transport, ip_version, addresses[length(addresses) - 1], last.status, last.response, last.latency_ms, attempts, last.detail);
+}
+
+function selected_dns_providers(catalog, opts) {
+	let selected = [];
+	for (let provider in catalog.providers)
+		if (provider.default_enabled != false && (length(opts.dns_providers) == 0 || contains(opts.dns_providers, provider.id)))
+			push(selected, provider);
+	return selected;
+}
+
+function dns_transports(opts) {
+	if (opts.dns_transport == 'doh') return [ 'doh' ];
+	if (opts.dns_transport == 'dot') return [ 'dot' ];
+	return [ 'doh', 'dot' ];
+}
+
+function dns_ip_versions(opts) {
+	if (opts.ip_mode == 'ipv6') return [ 6 ];
+	if (opts.ip_mode == 'both') return [ 4, 6 ];
+	if (opts.ip_mode == 'ipv4') return [ 4 ];
+
+	let route_available = function(ip_version) {
+		let args = [ 'ip', ip_version == 6 ? '-6' : '-4', 'route', 'show', 'default' ];
+		if (opts.interface != null)
+			push(args, 'dev', opts.interface);
+		let quoted = [];
+		for (let arg in args)
+			push(quoted, shell_quote(arg));
+		let proc = fs.popen(join(' ', quoted) + ' 2>/dev/null', 'r');
+		let output = proc ? proc.read('all') : '';
+		if (proc) proc.close();
+		return trim_str(output) != '';
+	};
+
+	if (route_available(4) && (opts.interface == null || interface_source_address(opts.interface, 4) != null))
+		return [ 4 ];
+	if (route_available(6) && (opts.interface == null || interface_source_address(opts.interface, 6) != null))
+		return [ 6 ];
+	return [ 4 ];
+}
+
+function dns_normalize_ipv6(value) {
+	value = lc(value || '');
+	let halves = split(value, '::');
+	if (length(halves) > 2)
+		return value;
+
+	let left = halves[0] == '' ? [] : split(halves[0], ':');
+	let right = length(halves) == 2 && halves[1] != '' ? split(halves[1], ':') : [];
+	let missing = length(halves) == 2 ? 8 - length(left) - length(right) : 0;
+	if (missing < 0 || (length(halves) == 1 && length(left) != 8))
+		return value;
+
+	let groups = [];
+	for (let group in left)
+		push(groups, group);
+	for (let i = 0; i < missing; i++)
+		push(groups, '0');
+	for (let group in right)
+		push(groups, group);
+
+	for (let i = 0; i < length(groups); i++)
+		while (length(groups[i]) > 1 && substr(groups[i], 0, 1) == '0')
+			groups[i] = substr(groups[i], 1);
+	return join(':', groups);
+}
+
+function dns_answer_set(answers) {
+	let result = {};
+	for (let answer in answers || []) {
+		if (answer.type != 'A' && answer.type != 'AAAA')
+			continue;
+		let value = answer.type == 'AAAA' ? dns_normalize_ipv6(answer.value) : lc(answer.value || '');
+		result[answer.type + ':' + value] = true;
+	}
+	return result;
+}
+
+function dns_answers_equal(left, right) {
+	left = dns_answer_set(left);
+	right = dns_answer_set(right);
+	for (let key in left)
+		if (right[key] != true)
+			return false;
+	for (let key in right)
+		if (left[key] != true)
+			return false;
+	return true;
+}
+
+function dns_summary(rows) {
+	let summary = { status: 'ok', passed: 0, failed: 0, doh_passed: 0, dot_passed: 0, findings: [], finding_details: [] };
+	let pairs = {};
+	for (let row in rows) {
+		let passed = dns_status_succeeded(row.status);
+		if (passed) summary.passed++; else summary.failed++;
+		if (passed && row.transport == 'doh') summary.doh_passed++;
+		if (passed && row.transport == 'dot') summary.dot_passed++;
+		let key = row.id + '-ipv' + row.ip_version;
+		pairs[key] = pairs[key] || { name: row.name, ip_label: row.ip_label };
+		pairs[key][row.transport] = row;
+	}
+
+	for (let key in pairs) {
+		let pair = pairs[key];
+		if (pair.doh && pair.dot) {
+			let doh_ok = dns_status_succeeded(pair.doh.status);
+			let dot_ok = dns_status_succeeded(pair.dot.status);
+			if (doh_ok && dot_ok && pair.doh.rcode != pair.dot.rcode) {
+				push(summary.findings, pair.name + ' ' + pair.ip_label + ': DoH and DoT returned different DNS response codes.');
+				push(summary.finding_details, { code: 'rcode_mismatch', name: pair.name, ip_label: pair.ip_label });
+			}
+			else if (doh_ok && dot_ok && !dns_answers_equal(pair.doh.answers, pair.dot.answers)) {
+				push(summary.findings, pair.name + ' ' + pair.ip_label + ': DoH and DoT returned different answers; resolver or CDN variation may be legitimate.');
+				push(summary.finding_details, { code: 'answer_mismatch', name: pair.name, ip_label: pair.ip_label });
+			}
+			else if (doh_ok && !dot_ok) {
+				push(summary.findings, pair.name + ' ' + pair.ip_label + ': DoH works while DoT fails; TCP/853 may be filtered.');
+				push(summary.finding_details, { code: 'dot_unavailable', name: pair.name, ip_label: pair.ip_label });
+			}
+			else if (!doh_ok && dot_ok) {
+				push(summary.findings, pair.name + ' ' + pair.ip_label + ': DoT works while DoH fails; the DoH endpoint may be filtered.');
+				push(summary.finding_details, { code: 'doh_unavailable', name: pair.name, ip_label: pair.ip_label });
+			}
+			else if (!doh_ok && !dot_ok) {
+				push(summary.findings, pair.name + ' ' + pair.ip_label + ': both encrypted DNS transports are unavailable.');
+				push(summary.finding_details, { code: 'both_unavailable', name: pair.name, ip_label: pair.ip_label });
+			}
+		}
+	}
+
+	if (summary.failed > 0)
+		summary.status = summary.passed > 0 ? 'warning' : 'error';
+	return summary;
+}
+
+function dns_result_failed(result) {
+	return length(result.errors || []) > 0 || (length(result.probes || []) > 0 && (result.summary && result.summary.passed || 0) == 0);
+}
+
+function build_dns_result(opts, catalog) {
+	let start = clock(true);
+	let providers = selected_dns_providers(catalog, opts);
+	let transports = dns_transports(opts);
+	let versions = dns_ip_versions(opts);
+	let name = opts.dns_name || catalog.default_probe_name || 'example.com';
+	let query_type = opts.dns_type || catalog.default_probe_type || 'A';
+	let result = {
+		version: 1,
+		mode: 'dns',
+		generated_at: now_iso(),
+		duration_ms: 0,
+		request: { providers: opts.dns_providers, transport: opts.dns_transport, name: name, type: query_type, ip_mode: opts.ip_mode, interface: opts.interface, timeout: opts.timeout },
+		probes: [],
+		summary: { status: 'ok', passed: 0, failed: 0, doh_passed: 0, dot_passed: 0, findings: [], finding_details: [] },
+		errors: []
+	};
+
+	if (length(providers) == 0)
+		push(result.errors, { code: 'no_dns_providers', message: 'No DNS providers matched the requested filters' });
+	if (fs.access('/usr/bin/kdig', 'x') != true && contains(transports, 'dot'))
+		push(result.errors, { code: 'kdig_missing', message: 'kdig is required for DNS-over-TLS checks' });
+
+	let total = length(providers) * length(transports) * length(versions);
+	update_dns_state({ running: true, started_at: result.generated_at, mode: 'dns', finished: 0, total: total });
+	write_partial_output(opts, result);
+
+	for (let provider in providers)
+		for (let transport in transports)
+			for (let ip_version in versions) {
+				update_dns_state({ running: true, current: (provider.name || provider.id) + ' / ' + dns_transport_label(transport) + ' / IPv' + ip_version, current_id: provider.id + '-' + transport + '-' + ip_version, finished: length(result.probes), total: total });
+				push(result.probes, probe_dns_transport(provider, transport, opts, ip_version, name, query_type));
+				result.summary = dns_summary(result.probes);
+				write_partial_output(opts, result);
+			}
+
+	let end = clock(true);
+	if (type(start) == 'array' && type(end) == 'array')
+		result.duration_ms = ((end[0] - start[0]) * 1000) + int((end[1] - start[1]) / 1000000);
+	return result;
+}
+
 function build_ai_result(opts, catalog) {
 	let start = clock(true);
 	let result = {
@@ -1905,14 +2678,26 @@ function list_ai_providers(catalog, as_json) {
 		printf('%s\t%s\t%s\n', provider.id, provider.category || 'ai', provider.name || provider.id);
 }
 
+function list_dns_providers(catalog, as_json) {
+	if (as_json) {
+		print_json(catalog);
+		return;
+	}
+
+	for (let provider in catalog.providers)
+		printf('%s\t%s\t%s\t%s\n', provider.id, provider.name || provider.id, provider.doh_url || '', provider.dot_hostname || '');
+}
+
 function self_test(catalog) {
 	let checks = [];
 	let catalog_ok = type(catalog.services) == 'object';
 	let ai_catalog_ok = fs.stat(AI_CATALOG_PATH) != null;
+	let dns_catalog_ok = fs.stat(DNS_CATALOG_PATH) != null;
 	let runtime_ok = fs.access('/tmp/run', 'w') == true;
 	let ca_ok = fs.stat('/etc/ssl/certs/ca-certificates.crt') != null || fs.stat('/etc/ssl/cert.pem') != null;
 	let curl_ok = fs.access('/usr/bin/curl', 'x') == true || fs.access('/bin/curl', 'x') == true;
 	let ucode_ok = fs.access('/usr/bin/ucode', 'x') == true || fs.access('/bin/ucode', 'x') == true;
+	let kdig_ok = fs.access('/usr/bin/kdig', 'x') == true || fs.access('/bin/kdig', 'x') == true;
 	let openwrt_release = fs.readfile('/etc/openwrt_release') || '';
 	let test_opts = default_options();
 	test_opts.timeout = 2;
@@ -1922,15 +2707,17 @@ function self_test(catalog) {
 
 	push(checks, { name: 'service_catalog', ok: catalog_ok, path: CATALOG_PATH });
 	push(checks, { name: 'ai_provider_catalog', ok: ai_catalog_ok, path: AI_CATALOG_PATH, required: false });
+	push(checks, { name: 'dns_provider_catalog', ok: dns_catalog_ok, path: DNS_CATALOG_PATH });
 	push(checks, { name: 'runtime_dir_parent', ok: runtime_ok, path: '/tmp/run' });
 	push(checks, { name: 'ca_bundle', ok: ca_ok });
 	push(checks, { name: 'curl', ok: curl_ok });
 	push(checks, { name: 'ucode', ok: ucode_ok });
+	push(checks, { name: 'kdig', ok: kdig_ok });
 	push(checks, { name: 'openwrt_release_present', ok: openwrt_release != '' });
 	push(checks, { name: 'external_ipv4_discovery', ok: external_ipv4 != null });
 	push(checks, { name: 'external_ipv6_discovery', ok: external_ipv6 != null, required: false });
 
-	return { version: VERSION, ok: catalog_ok && runtime_ok && ca_ok && curl_ok && ucode_ok && external_ipv4 != null, checks: checks };
+	return { version: VERSION, ok: catalog_ok && dns_catalog_ok && runtime_ok && ca_ok && curl_ok && ucode_ok && kdig_ok && external_ipv4 != null, checks: checks };
 }
 
 function print_plain_result(result) {
@@ -1977,6 +2764,30 @@ function print_plain_ai_result(result) {
 	}
 }
 
+function print_plain_dns_result(result) {
+	printf('IPRegion DNS %s\n', VERSION);
+	printf('Generated: %s\n', result.generated_at);
+	printf('Probe: %s %s\n\n', result.request.name, result.request.type);
+	for (let row in result.probes) {
+		let values = [];
+		for (let answer in row.answers || [])
+			push(values, answer.value);
+		printf('  %s\t%s\t%s\t%s\t%s\n', row.name, row.transport_label, row.ip_label, row.label, length(values) ? join(', ', values) : row.diagnosis);
+	}
+
+	if (length(result.summary.findings || [])) {
+		printf('\nFindings:\n');
+		for (let finding in result.summary.findings)
+			printf('  %s\n', finding);
+	}
+
+	if (length(result.errors) > 0) {
+		printf('\nErrors:\n');
+		for (let err in result.errors)
+			printf('  %s: %s\n', err.code, err.message);
+	}
+}
+
 let opts = parse_args(ARGV || []);
 let catalog = read_catalog();
 opts = apply_uci_config(opts);
@@ -1993,6 +2804,12 @@ if (opts.list_services) {
 if (opts.list_ai_providers) {
 	let ai_catalog = read_ai_catalog();
 	list_ai_providers(ai_catalog, opts.json);
+	exit(0);
+}
+
+if (opts.list_dns_providers) {
+	let dns_catalog = read_dns_catalog();
+	list_dns_providers(dns_catalog, opts.json);
 	exit(0);
 }
 
@@ -2015,6 +2832,23 @@ if (opts.mode == 'ai') {
 		print_plain_ai_result(ai_result);
 
 	exit(length(ai_result.errors) > 0 ? 1 : 0);
+}
+
+if (opts.mode == 'dns') {
+	let dns_catalog = read_dns_catalog();
+	validate_dns_provider_ids(dns_catalog, opts.dns_providers);
+	let dns_result = build_dns_result(opts, dns_catalog);
+
+	if (opts.output != null)
+		write_json_output(opts, dns_result, opts.json);
+	else if (opts.json)
+		write_json_output(opts, dns_result, true);
+	else
+		print_plain_dns_result(dns_result);
+
+	let exit_code = dns_result_failed(dns_result) ? 1 : 0;
+	update_dns_state({ running: false, completed: true, current: null, current_id: null, finished: length(dns_result.probes), total: length(dns_result.probes), exit_code: exit_code, started_at: dns_result.generated_at, finished_at: now_iso(), duration_ms: dns_result.duration_ms, result_file: opts.output });
+	exit(exit_code);
 }
 
 let result = build_result(opts, catalog);

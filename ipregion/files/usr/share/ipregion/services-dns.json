@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "default_probe_name": "example.com",
+  "default_probe_type": "A",
+  "providers": [
+    {
+      "id": "google",
+      "name": "Google Public DNS",
+      "default_enabled": true,
+      "doh_url": "https://dns.google/dns-query",
+      "doh_hostname": "dns.google",
+      "dot_hostname": "dns.google",
+      "ipv4": ["8.8.8.8", "8.8.4.4"],
+      "ipv6": ["2001:4860:4860::8888", "2001:4860:4860::8844"]
+    },
+    {
+      "id": "cloudflare",
+      "name": "Cloudflare DNS",
+      "default_enabled": true,
+      "doh_url": "https://cloudflare-dns.com/dns-query",
+      "doh_hostname": "cloudflare-dns.com",
+      "dot_hostname": "one.one.one.one",
+      "ipv4": ["1.1.1.1", "1.0.0.1"],
+      "ipv6": ["2606:4700:4700::1111", "2606:4700:4700::1001"]
+    },
+    {
+      "id": "quad9",
+      "name": "Quad9 DNS (non-filtering)",
+      "default_enabled": true,
+      "doh_url": "https://dns10.quad9.net/dns-query",
+      "doh_hostname": "dns10.quad9.net",
+      "dot_hostname": "dns10.quad9.net",
+      "ipv4": ["9.9.9.10", "149.112.112.10"],
+      "ipv6": ["2620:fe::10", "2620:fe::fe:10"]
+    },
+    {
+      "id": "adguard",
+      "name": "AdGuard DNS (non-filtering)",
+      "default_enabled": true,
+      "doh_url": "https://unfiltered.adguard-dns.com/dns-query",
+      "doh_hostname": "unfiltered.adguard-dns.com",
+      "dot_hostname": "unfiltered.adguard-dns.com",
+      "ipv4": ["94.140.14.140", "94.140.14.141"],
+      "ipv6": ["2a10:50c0::1:ff", "2a10:50c0::2:ff"]
+    }
+  ]
+}

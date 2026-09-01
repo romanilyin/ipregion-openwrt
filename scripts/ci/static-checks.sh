@@ -7,6 +7,7 @@ export ROOT_DIR
 
 python3 - <<'PY'
 import json
+import ipaddress
 import os
 import re
 from pathlib import Path
@@ -16,6 +17,7 @@ root = Path(os.environ['ROOT_DIR'])
 json_files = [
     root / 'ipregion/files/usr/share/ipregion/services.json',
     root / 'ipregion/files/usr/share/ipregion/services-ai.json',
+    root / 'ipregion/files/usr/share/ipregion/services-dns.json',
     root / 'luci-app-ipregion/root/usr/share/luci/menu.d/luci-app-ipregion.json',
     root / 'luci-app-ipregion/root/usr/share/rpcd/acl.d/luci-app-ipregion.json',
 ]
@@ -54,6 +56,26 @@ for provider in ai_catalog:
     if not provider.get('url'):
         raise SystemExit(f'AI provider {provider_id} has no url')
 
+dns_catalog = json.loads((root / 'ipregion/files/usr/share/ipregion/services-dns.json').read_text(encoding='utf-8'))
+dns_ids = set()
+for provider in dns_catalog.get('providers', []):
+    provider_id = provider.get('id')
+    if not provider_id or provider_id in dns_ids:
+        raise SystemExit(f'invalid duplicate DNS provider id: {provider_id}')
+    dns_ids.add(provider_id)
+    if not provider.get('doh_url', '').startswith('https://'):
+        raise SystemExit(f'DNS provider {provider_id} has no HTTPS DoH URL')
+    if not provider.get('doh_hostname') or not provider.get('dot_hostname'):
+        raise SystemExit(f'DNS provider {provider_id} has incomplete TLS hostnames')
+    if not provider.get('ipv4') or not provider.get('ipv6'):
+        raise SystemExit(f'DNS provider {provider_id} has incomplete endpoint addresses')
+    for address in provider['ipv4']:
+        if ipaddress.ip_address(address).version != 4:
+            raise SystemExit(f'DNS provider {provider_id} has invalid IPv4 address: {address}')
+    for address in provider['ipv6']:
+        if ipaddress.ip_address(address).version != 6:
+            raise SystemExit(f'DNS provider {provider_id} has invalid IPv6 address: {address}')
+
 acl = json.loads((root / 'luci-app-ipregion/root/usr/share/rpcd/acl.d/luci-app-ipregion.json').read_text(encoding='utf-8'))
 ubus_read = acl['luci-app-ipregion']['read']['ubus']
 ubus_write = acl['luci-app-ipregion']['write']['ubus']
@@ -78,6 +100,7 @@ if 'apk add' in install_ipk or '.apk' in install_ipk:
 
 print(f'Service catalog OK: {len(services)} services')
 print(f'AI provider catalog OK: {len(ai_catalog)} providers')
+print(f'DNS provider catalog OK: {len(dns_ids)} providers')
 print(f'gettext catalog OK: {len(messages)} UI strings')
 PY
 

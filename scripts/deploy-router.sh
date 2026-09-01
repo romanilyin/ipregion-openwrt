@@ -67,6 +67,7 @@ scp_to "$ROOT_DIR/ipregion/files/usr/share/ipregion/handlers.uc" "/usr/share/ipr
 scp_to "$ROOT_DIR/ipregion/files/usr/share/ipregion/jsonpath.uc" "/usr/share/ipregion/jsonpath.uc"
 scp_to "$ROOT_DIR/ipregion/files/usr/share/ipregion/services.json" "/usr/share/ipregion/services.json"
 scp_to "$ROOT_DIR/ipregion/files/usr/share/ipregion/services-ai.json" "/usr/share/ipregion/services-ai.json"
+scp_to "$ROOT_DIR/ipregion/files/usr/share/ipregion/services-dns.json" "/usr/share/ipregion/services-dns.json"
 scp_to "$ROOT_DIR/ipregion/files/etc/config/ipregion" "/etc/config/ipregion"
 scp_to "$ROOT_DIR/luci-app-ipregion/root/usr/share/rpcd/acl.d/luci-app-ipregion.json" "/usr/share/rpcd/acl.d/luci-app-ipregion.json"
 scp_to "$ROOT_DIR/luci-app-ipregion/root/usr/share/rpcd/ucode/ipregion.uc" "/usr/share/rpcd/ucode/ipregion.uc"

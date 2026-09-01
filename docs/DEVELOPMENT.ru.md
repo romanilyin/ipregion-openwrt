@@ -96,6 +96,7 @@ Router smoke checks должны покрывать:
 - `ipregion --self-test --json`
 - обычные GeoIP/popular/CDN runs через CLI и ubus
 - `ipregion ai --provider google_gemini --json`
+- `ipregion dns --provider google --transport both --ip-mode ipv4 --json`
 - загрузку LuCI page после `rpcd` restart и `uhttpd` reload
 - GeoIP режимы `lookup` и `route`
 - SOCKS5 local DNS и remote DNS, если доступен proxy
@@ -110,6 +111,9 @@ Runtime data остается локально в `/tmp/run/ipregion/`.
 - AI state: `/tmp/run/ipregion/ai-state.json`
 - AI result: `/tmp/run/ipregion/ai-result.json`
 - AI log: `/tmp/run/ipregion/ai-log.txt`
+- DNS state: `/tmp/run/ipregion/dns-state.json`
+- DNS result: `/tmp/run/ipregion/dns-result.json`
+- DNS log: `/tmp/run/ipregion/dns-log.txt`
 
 Endpoint failures должны оставаться per-service и не должны прерывать весь run.
 
@@ -128,7 +132,8 @@ Endpoint failures должны оставаться per-service и не долж
 
 - Валидируйте user-controlled `interface`, `proxy` и service/provider ids перед использованием в commands.
 - Не добавляйте firewall, nftables, mwan3, podkop, WARP или routing changes.
-- Это diagnostics-only приложение, которое только делает outbound HTTPS requests.
+- Это diagnostics-only приложение, которое делает только outbound HTTPS и аутентифицированные DNS-over-TLS requests.
+- `knot-dig` обеспечивает строгую проверку сертификата и hostname для DoT; он должен оставаться в package `DEPENDS`.
 - SOCKS5 checks должны поддерживать local DNS через `socks5://` и remote DNS через `socks5h://`.
 - Debug/log output должен оставаться локально в `/tmp/run/ipregion/`.
 
@@ -140,7 +145,7 @@ Public GitHub Release APK installer находится в корне репоз�
 - Он скачивает `ipregion*.apk`, `luci-app-ipregion*.apk` и `luci-i18n-ipregion-ru*.apk`.
 - Он устанавливает через `apk` и по умолчанию использует `--allow-untrusted`, потому что GitHub Release APK не из official OpenWrt package repository.
 - Он поддерживает `IPREGION_RELEASE`, `IPREGION_INSTALL_LUCI`, `IPREGION_APK_UPDATE`, `IPREGION_REPO`, `IPREGION_GITHUB_API`, `IPREGION_GITHUB_DOWNLOAD_BASE`, `IPREGION_DOWNLOAD_RETRIES`, `IPREGION_DOWNLOAD_RETRY_DELAY` и `IPREGION_APK_FLAGS`.
-- `install-ipk.sh` скачивает соответствующие `.ipk` release assets и устанавливает их через `opkg`; вместо APK-specific options он поддерживает `IPREGION_OPKG_UPDATE` и `IPREGION_OPKG_FLAGS`.
+- `install-ipk.sh` по умолчанию использует последний release, проверенный на реальном OpenWrt 24.10, скачивает соответствующие `.ipk` assets и устанавливает их через `opkg`; вместо APK-specific options он поддерживает `IPREGION_RELEASE`, `IPREGION_OPKG_UPDATE` и `IPREGION_OPKG_FLAGS`.
 - Кнопка обновления LuCI сохраняется для public GitHub Release builds и защищена от downgrade, если установленный пакет новее latest release на GitHub.
 
 Перед публикацией release:
@@ -148,7 +153,8 @@ Public GitHub Release APK installer находится в корне репоз�
 - запустить `scripts/ci/static-checks.sh`
 - запустить `scripts/ci/ucode-checks.sh` с локально собранным `ucode`
 - собрать packages в OpenWrt SDK
-- загрузить versioned APK/IPK assets и stable aliases с именами `ipregion.apk`, `luci-app-ipregion.apk`, `luci-i18n-ipregion-ru.apk`, `ipregion.ipk`, `luci-app-ipregion.ipk` и `luci-i18n-ipregion-ru.ipk`
+- загрузить versioned APK assets и stable aliases с именами `ipregion.apk`, `luci-app-ipregion.apk` и `luci-i18n-ipregion-ru.apk`
+- публиковать versioned IPK assets и aliases `ipregion.ipk`, `luci-app-ipregion.ipk` и `luci-i18n-ipregion-ru.ipk` только после install, CLI, rpcd и LuCI smoke текущей версии пакета на реальном OpenWrt 24.10; иначе оставлять `install-ipk.sh` закрепленным на последнем проверенном IPK release
 - выполнить focused router smoke tests
 - проверить LuCI после hard refresh и `rpcd` restart
 

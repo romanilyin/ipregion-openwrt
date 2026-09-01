@@ -4,7 +4,7 @@
 
 # IPRegion for OpenWrt
 
-**Route, region, CDN and AI endpoint diagnostics for OpenWrt routers.**
+**Route, region, CDN, AI endpoint and encrypted DNS diagnostics for OpenWrt routers.**
 
 [English](./README.md) |
 [Русский](./docs/README.ru.md) |
@@ -24,7 +24,7 @@
 
 </div>
 
-IPRegion is an OpenWrt CLI and LuCI app for checking how GeoIP APIs, popular services, CDN endpoints and AI providers see your router route, interface or SOCKS5 proxy.
+IPRegion is an OpenWrt CLI and LuCI app for checking how GeoIP APIs, popular services, CDN endpoints and AI providers see your router route, and whether public DoH and DoT resolvers are reachable without transport anomalies.
 
 Validated runtime targets: OpenWrt 25.12.1+ with `apk`, and OpenWrt 24.10.6 with `opkg`.
 
@@ -36,6 +36,7 @@ IPRegion runs diagnostics from the router itself and compares independent servic
 - Popular service checks show region, access, rate-limit or denial signals from major platforms.
 - CDN checks show which CDN edge or region the router reaches.
 - AI checks probe real AI API endpoint domains in safe unauthenticated mode.
+- DNS security checks probe authenticated DoH and DoT endpoints from Google, Cloudflare, Quad9 and AdGuard DNS.
 - Checks can use the default route, a selected OpenWrt interface or a SOCKS5 proxy.
 
 Packages:
@@ -74,7 +75,7 @@ The installer downloads `ipregion*.apk`, `luci-app-ipregion*.apk` and `luci-i18n
 
 APK installer options:
 
-- `IPREGION_RELEASE=2026.5.28-1`: install a specific GitHub release tag instead of `latest`.
+- `IPREGION_RELEASE=2026.9.1-1`: install a specific GitHub release tag instead of `latest`.
 - `IPREGION_INSTALL_LUCI=0`: install only the CLI/backend package.
 - `IPREGION_APK_UPDATE=0`: skip `apk update` before installation.
 - `IPREGION_DOWNLOAD_RETRIES=5`: retry GitHub metadata and APK downloads more times.
@@ -82,7 +83,7 @@ APK installer options:
 Pinned release example:
 
 ```sh
-wget -qO- https://raw.githubusercontent.com/romanilyin/ipregion-openwrt/main/install.sh | IPREGION_RELEASE=2026.5.28-1 sh
+wget -qO- https://raw.githubusercontent.com/romanilyin/ipregion-openwrt/main/install.sh | IPREGION_RELEASE=2026.9.1-1 sh
 ```
 
 Manual install from downloaded APK files:
@@ -99,7 +100,7 @@ Run on an OpenWrt 24.10.* router:
 wget -qO- https://raw.githubusercontent.com/romanilyin/ipregion-openwrt/main/install-ipk.sh | sh
 ```
 
-The IPK installer downloads `ipregion*.ipk`, `luci-app-ipregion*.ipk` and `luci-i18n-ipregion-ru*.ipk` from the latest GitHub Release and installs them with `opkg`. It is separate from the APK installer to avoid mixing OpenWrt package managers.
+The IPK installer defaults to the last release validated on real OpenWrt 24.10 hardware, `2026.5.28-1`, and installs its `ipregion*.ipk`, `luci-app-ipregion*.ipk` and `luci-i18n-ipregion-ru*.ipk` assets with `opkg`. Set `IPREGION_RELEASE` only to another release that explicitly includes validated IPK assets.
 
 Manual install from downloaded IPK files:
 
@@ -111,7 +112,7 @@ opkg install ./ipregion*.ipk ./luci-app-ipregion*.ipk ./luci-i18n-ipregion-ru*.i
 
 Open `Status -> IP Region` in LuCI.
 
-- Run GeoIP, popular service, CDN and AI endpoint checks from one page.
+- Run GeoIP, popular service, CDN, encrypted DNS and AI endpoint checks from one page.
 - Choose IP mode, interface, SOCKS5 proxy, timeout and GeoIP mode.
 - Configure the saved SOCKS5 proxy in `Services -> IP Region`, then select it on the Status page.
 - Set a reference country to highlight matching country values in orange and different country values in blue.
@@ -135,6 +136,8 @@ ipregion --interface wan --group primary --json
 ipregion --proxy 127.0.0.1:1080 --proxy-dns remote --group custom --json
 ipregion ai --json
 ipregion ai --provider google_gemini --json
+ipregion dns --json
+ipregion dns --provider google --transport both --ip-mode ipv4 --json
 ```
 
 ## Check Modes
@@ -147,6 +150,8 @@ ipregion ai --provider google_gemini --json
 - `--geoip-mode route`: ask supported GeoIP APIs what country they see for the request itself.
 - `ipregion ai --json`: run safe AI provider endpoint probes without storing or requesting API keys.
 - `ipregion ai --ip-mode both --json`: run each selected AI provider through separate IPv4 and IPv6 probes.
+- `ipregion dns --json`: check authenticated DoH and DoT connections to the enabled public DNS providers.
+- `ipregion dns --dns-name example.com --dns-type A --json`: run encrypted DNS probes for a validated query name and record type.
 
 For SOCKS5 proxy checks:
 
@@ -156,12 +161,16 @@ For SOCKS5 proxy checks:
 ## Notes
 
 - `401`, `403`, `404`, `405` and `429` in AI mode can still mean that the provider endpoint was reached; DNS, TLS, timeout and network failures are classified separately.
+- Encrypted DNS checks connect to published resolver IP addresses and verify provider TLS hostnames, avoiding dependence on the router's current DNS bootstrap result.
+- DNS mode ignores a proxy saved in UCI and rejects an explicit `--proxy`; DoH binds to a selected interface, while DoT binds to that interface's source address.
+- DNS `auto` mode prefers an available IPv4 default route and falls back to IPv6 on IPv6-only routers; use `--ip-mode both` to test both explicitly.
+- A successful DoH or DoT check does not prove that ordinary UDP/TCP port 53 is free from interception.
 - With domain-based split routing, a generic egress IP check can differ from the route used by a specific service or AI endpoint domain.
 - For policy-routing setups, a local SOCKS5 endpoint that already exits through the intended tunnel is usually the most reliable diagnostic target.
 
 ## Privacy And Scope
 
-Diagnostics contact third-party GeoIP, streaming, CDN and AI endpoints. Those services receive the router's public IP for each check.
+Diagnostics contact third-party GeoIP, streaming, CDN, AI and public DNS endpoints. Those services receive the router's public IP for each check.
 
 Runtime state, results and logs stay local under `/tmp/run/ipregion/`.
 
