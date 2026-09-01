@@ -44,6 +44,10 @@ expect_failure env IPREGION_CATALOG_PATH="$ROOT_DIR/ipregion/files/usr/share/ipr
 	IPREGION_DNS_CATALOG_PATH="$ROOT_DIR/ipregion/files/usr/share/ipregion/services-dns.json" \
 	IPREGION_RUNTIME_DIR="$OUT_DIR/runtime" \
 	"$UCODE" "$ROOT_DIR/ipregion/files/usr/share/ipregion/ipregion.uc" dns --no-uci --proxy 127.0.0.1:1080 --transport doh --ip-mode ipv4 --json
+expect_failure env IPREGION_CATALOG_PATH="$ROOT_DIR/ipregion/files/usr/share/ipregion/services.json" \
+	IPREGION_DNS_CATALOG_PATH="$ROOT_DIR/ipregion/files/usr/share/ipregion/services-dns.json" \
+	IPREGION_RUNTIME_DIR="$OUT_DIR/runtime" \
+	"$UCODE" "$ROOT_DIR/ipregion/files/usr/share/ipregion/ipregion.uc" dns --no-uci --provider interface_dns --transport doh --ip-mode ipv4 --json
 
 "$UCODE" "$ROOT_DIR/ipregion/files/usr/share/ipregion/http.uc" >/dev/null
 "$UCODE" "$ROOT_DIR/ipregion/files/usr/share/ipregion/handlers.uc" >/dev/null

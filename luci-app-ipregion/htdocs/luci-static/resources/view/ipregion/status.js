@@ -130,6 +130,7 @@ function dnsBadge(row) {
 		dns_servfail: _('SERVFAIL'),
 		dns_error: _('DNS error'),
 		no_answer: _('No answer'),
+		truncated: _('Truncated'),
 		malformed_response: _('Malformed response'),
 		unavailable: _('Unavailable')
 	};
@@ -138,7 +139,7 @@ function dnsBadge(row) {
 
 	if (status === 'ok')
 		cls += ' ipregion-ok';
-	else if (status === 'degraded' || status === 'dns_nxdomain' || status === 'dns_servfail' || status === 'dns_error' || status === 'no_answer')
+	else if (status === 'degraded' || status === 'dns_nxdomain' || status === 'dns_servfail' || status === 'dns_error' || status === 'no_answer' || status === 'truncated')
 		cls += ' ipregion-warn';
 	else if (status === 'unavailable')
 		cls += ' ipregion-na';
@@ -151,17 +152,18 @@ function dnsBadge(row) {
 function dnsDiagnosis(row) {
 	var transport = row && (row.transport_label || row.transport) || _('DNS transport');
 	switch (row && row.status) {
-	case 'ok': return transport + ' ' + _('returned a valid authenticated DNS response.');
+	case 'ok': return transport + ' ' + (row.encrypted ? _('returned a valid authenticated DNS response.') : _('returned a valid direct DNS response.'));
 	case 'degraded': return transport + ' ' + _('succeeded through a fallback resolver address.');
 	case 'timeout': return transport + ' ' + _('did not respond before timeout; the endpoint or transport may be dropped.');
 	case 'certificate_failed': return transport + ' ' + _('certificate validation failed; check system time or possible TLS interception.');
 	case 'tls_failed': return transport + ' ' + _('TLS handshake failed.');
-	case 'connection_failed': return transport + ' ' + _('TCP connection failed or was reset.');
+	case 'connection_failed': return transport + ' ' + _('Connection failed or was reset.');
 	case 'http_failed': return _('DoH returned an HTTP error.');
 	case 'dns_nxdomain': return _('The resolver returned NXDOMAIN for the probe name.');
 	case 'dns_servfail': return _('The resolver returned SERVFAIL for the probe name.');
 	case 'dns_error': return _('The resolver returned a DNS error response.');
 	case 'no_answer': return _('The resolver returned NOERROR without a usable answer.');
+	case 'truncated': return _('The UDP response was truncated and was not retried over TCP.');
 	case 'malformed_response': return _('The endpoint returned a malformed or mismatched DNS response.');
 	case 'unavailable': return _('The requested DNS transport is unavailable.');
 	default: return row && row.diagnosis || _('Unknown error');
@@ -176,8 +178,23 @@ function dnsFinding(finding) {
 	case 'dot_unavailable': return prefix + _('DoH works while DoT fails; TCP/853 may be filtered.');
 	case 'doh_unavailable': return prefix + _('DoT works while DoH fails; the DoH endpoint may be filtered.');
 	case 'both_unavailable': return prefix + _('both encrypted DNS transports are unavailable.');
+	case 'udp_unavailable': return prefix + _('UDP/53 is unavailable.');
+	case 'tcp_unavailable': return prefix + _('TCP/53 is unavailable.');
+	case 'plain_answer_mismatch': return prefix + _('Plain and authenticated DNS returned different answers; resolver or CDN variation may be legitimate.');
+	case 'likely_udp_dns_interception': return prefix + _('UDP/53 returned a different DNS response code while TCP/53 matched authenticated DNS; UDP interception is likely.');
+	case 'likely_tcp_dns_interception': return prefix + _('TCP/53 returned a different DNS response code while UDP/53 matched authenticated DNS; TCP interception is likely.');
+	case 'likely_plain_dns_interception': return prefix + _('UDP/53 and TCP/53 agree with each other but differ from authenticated DNS; plain DNS interception is likely.');
 	default: return finding.message || finding.code || '';
 	}
+}
+
+function dnsInterceptionText(summary) {
+	var status = summary && summary.interception && summary.interception.status || 'not_run';
+	if (status === 'likely') return _('Likely DNS interception');
+	if (status === 'no_mismatch_detected') return _('No DNS response mismatch detected');
+	if (status === 'inconclusive') return _('Interception check inconclusive');
+	if (status === 'pending') return _('Interception comparison pending');
+	return _('Interception comparison not run');
 }
 
 function dnsStartError(result) {
@@ -193,7 +210,8 @@ function dnsStartError(result) {
 function dnsErrorText(error) {
 	switch (error && error.code) {
 	case 'no_dns_providers': return error.code + ': ' + _('No DNS providers matched the requested filters');
-	case 'kdig_missing': return error.code + ': ' + _('kdig is required for DNS-over-TLS checks');
+	case 'no_compatible_dns_transports': return error.code + ': ' + _('No selected DNS provider supports the requested transport');
+	case 'kdig_missing': return error.code + ': ' + _('kdig is required for UDP, TCP and DNS-over-TLS checks');
 	default: return error && (error.code + ': ' + (error.message || _('Unknown error'))) || _('Unknown error');
 	}
 }
@@ -201,6 +219,12 @@ function dnsErrorText(error) {
 function dnsAnswers(row) {
 	var answers = row && row.answers || [];
 	return answers.length ? answers.map(function(answer) { return answer.value; }).join(', ') : _('N/A');
+}
+
+function dnsTlsStatus(row) {
+	if (!row || row.tls_verified == null)
+		return _('N/A');
+	return row.tls_verified ? _('Verified') : _('Not verified');
 }
 
 function resultCell(result) {
@@ -336,7 +360,7 @@ function renderDnsRow(row) {
 		E('td', { 'class': 'td' }, [ row.transport_label || row.transport || '' ]),
 		E('td', { 'class': 'td' }, [ row.ip_label || ('IPv' + row.ip_version) ]),
 		E('td', { 'class': 'td', 'id': 'ipregion-dns-endpoint-' + id }, [ row.endpoint || _('N/A') ]),
-		E('td', { 'class': 'td', 'id': 'ipregion-dns-tls-' + id }, [ row.tls_verified ? _('Verified') : _('Not verified') ]),
+		E('td', { 'class': 'td', 'id': 'ipregion-dns-tls-' + id }, [ dnsTlsStatus(row) ]),
 		E('td', { 'class': 'td', 'id': 'ipregion-dns-status-' + id }, [ dnsBadge(row), row.rcode ? ' ' + row.rcode : '' ]),
 		E('td', { 'class': 'td', 'id': 'ipregion-dns-answer-' + id }, [ dnsAnswers(row) ]),
 		E('td', { 'class': 'td', 'id': 'ipregion-dns-time-' + id }, [ row.latency_ms != null ? row.latency_ms + ' ms' : _('N/A') ]),
@@ -366,8 +390,8 @@ function renderDnsTable(rows) {
 		tableRows.push(E('tr', { 'class': 'tr ipregion-dns-empty-row', 'id': 'ipregion-dns-empty' }, [ E('td', { 'class': 'td', 'colspan': 9 }, [ _('No results yet') ]) ]));
 
 	return E('div', { 'class': 'ipregion-card ipregion-table-card' }, [
-		E('h3', {}, [ _('Encrypted DNS results') ]),
-		E('p', { 'class': 'ipregion-muted' }, [ _('DoH and DoT connect directly to published resolver IP addresses and verify the provider TLS hostname.') ]),
+		E('h3', {}, [ _('DNS results') ]),
+		E('p', { 'class': 'ipregion-muted' }, [ _('One run checks direct UDP/53, TCP/53, DoH and DoT responses in the same table. TLS hostnames are verified for encrypted transports.') ]),
 		E('table', { 'class': 'table', 'id': 'ipregion-dns-table' }, tableRows)
 	]);
 }
@@ -426,6 +450,7 @@ function resetDnsUi() {
 	dnsGeneratedAt = null;
 	clearDnsRows();
 	setContent('ipregion-dns-summary', '');
+	setContent('ipregion-dns-interception', '');
 	setContent('ipregion-dns-findings', '');
 	setContent('ipregion-dns-errors', '');
 }
@@ -505,7 +530,7 @@ function updateDnsRows(rows) {
 			return;
 		}
 		setContent('ipregion-dns-endpoint-' + id, row.endpoint || _('N/A'));
-		setContent('ipregion-dns-tls-' + id, row.tls_verified ? _('Verified') : _('Not verified'));
+		setContent('ipregion-dns-tls-' + id, dnsTlsStatus(row));
 		setContent('ipregion-dns-status-' + id, [ dnsBadge(row), row.rcode ? ' ' + row.rcode : '' ]);
 		setContent('ipregion-dns-answer-' + id, dnsAnswers(row));
 		setContent('ipregion-dns-time-' + id, row.latency_ms != null ? row.latency_ms + ' ms' : _('N/A'));
@@ -584,18 +609,13 @@ function renderDnsOptions(providers, result) {
 		].concat(providers.map(function(provider) {
 			return E('option', { 'value': provider.id }, [ provider.name || provider.id ]);
 		}))) ]),
-		E('label', {}, [ _('Encrypted DNS transport'), E('select', { 'id': 'ipregion-dns-transport' }, [
-			E('option', { 'value': 'both' }, [ _('DoH and DoT') ]),
-			E('option', { 'value': 'doh' }, [ _('DoH only') ]),
-			E('option', { 'value': 'dot' }, [ _('DoT only') ])
-		]) ]),
 		E('label', {}, [ _('Probe name'), E('input', { 'id': 'ipregion-dns-name', 'type': 'text', 'value': request.name || 'example.com' }) ]),
 		E('label', {}, [ _('Record type'), E('select', { 'id': 'ipregion-dns-type' }, [
 			E('option', { 'value': 'A', 'selected': request.type !== 'AAAA' ? 'selected' : null }, [ 'A' ]),
 			E('option', { 'value': 'AAAA', 'selected': request.type === 'AAAA' ? 'selected' : null }, [ 'AAAA' ])
 		]) ]),
-		E('p', { 'class': 'ipregion-muted ipregion-group-help' }, [ _('DNS checks use the IP mode, interface and timeout controls above. DoH binds to the selected interface; DoT binds to its source address. SOCKS5 proxy routing is not used.') ]),
-		E('p', { 'class': 'ipregion-muted ipregion-group-help' }, [ _('A successful encrypted DNS check does not prove that ordinary UDP or TCP port 53 is free from interception.') ])
+		E('p', { 'class': 'ipregion-muted ipregion-group-help' }, [ _('The single DNS run checks UDP/53, TCP/53, DoH and DoT using the IP mode, interface and timeout controls above. SOCKS5 proxy routing is not used.') ]),
+		E('p', { 'class': 'ipregion-muted ipregion-group-help' }, [ _('Matching responses mean no mismatch was detected; they do not prove that interception is absent.') ])
 	]);
 }
 
@@ -605,6 +625,7 @@ function renderDnsSummary(result) {
 	return E('div', { 'class': 'ipregion-card' }, [
 		E('h3', {}, [ _('DNS security summary') ]),
 		E('p', { 'id': 'ipregion-dns-summary' }, [ _('Passed'), ': ', String(summary.passed || 0), ' / ', _('Failed'), ': ', String(summary.failed || 0) ]),
+		E('p', { 'id': 'ipregion-dns-interception' }, [ dnsInterceptionText(summary) ]),
 		E('div', { 'id': 'ipregion-dns-findings' }, findings.length ? [
 			E('h4', {}, [ _('Findings') ]),
 			E('ul', {}, findings.map(function(finding) { return E('li', {}, [ finding ]); }))
@@ -793,6 +814,7 @@ function applyDnsResult(result) {
 	updateDnsRows(result.probes || []);
 	updateErrors('ipregion-dns-errors', result.errors, dnsErrorText);
 	setContent('ipregion-dns-summary', [ _('Passed'), ': ', String(summary.passed || 0), ' / ', _('Failed'), ': ', String(summary.failed || 0) ]);
+	setContent('ipregion-dns-interception', dnsInterceptionText(summary));
 	var findings = (summary.finding_details || []).length ? summary.finding_details.map(dnsFinding) : summary.findings || [];
 	setContent('ipregion-dns-findings', findings.length ? [
 		E('h4', {}, [ _('Findings') ]),
@@ -938,7 +960,7 @@ return view.extend({
 			E('div', { 'class': 'ipregion-hero' }, [
 				E('div', {}, [
 					E('h2', {}, [ _('DNS Security') ]),
-					E('p', {}, [ _('Check whether major public DNS resolvers are reachable over authenticated DoH and DoT connections.') ])
+					E('p', {}, [ _('Compare UDP/53, TCP/53, DoH and DoT responses from public and active-interface DNS resolvers in one check.') ])
 				])
 			]),
 			renderDnsOptions(dnsProviders, dnsResult),
@@ -947,7 +969,7 @@ return view.extend({
 					var provider = fieldValue('ipregion-dns-provider');
 					resetDnsUi();
 					return callDnsStart(Object.assign(dnsRouteOptions(), {
-						transport: fieldValue('ipregion-dns-transport'),
+						transport: 'all',
 						name: fieldValue('ipregion-dns-name'),
 						type: fieldValue('ipregion-dns-type'),
 						providers: provider ? [ provider ] : []

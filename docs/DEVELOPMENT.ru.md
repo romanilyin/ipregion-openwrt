@@ -96,7 +96,7 @@ Router smoke checks должны покрывать:
 - `ipregion --self-test --json`
 - обычные GeoIP/popular/CDN runs через CLI и ubus
 - `ipregion ai --provider google_gemini --json`
-- `ipregion dns --provider google --transport both --ip-mode ipv4 --json`
+- `ipregion dns --provider google --transport all --ip-mode ipv4 --json`
 - загрузку LuCI page после `rpcd` restart и `uhttpd` reload
 - GeoIP режимы `lookup` и `route`
 - SOCKS5 local DNS и remote DNS, если доступен proxy
@@ -132,7 +132,7 @@ Endpoint failures должны оставаться per-service и не долж
 
 - Валидируйте user-controlled `interface`, `proxy` и service/provider ids перед использованием в commands.
 - Не добавляйте firewall, nftables, mwan3, podkop, WARP или routing changes.
-- Это diagnostics-only приложение, которое делает только outbound HTTPS и аутентифицированные DNS-over-TLS requests.
+- Это diagnostics-only приложение, которое делает outbound UDP/53, TCP/53, HTTPS/443 и аутентифицированные DNS-over-TLS/853 requests.
 - `knot-dig` обеспечивает строгую проверку сертификата и hostname для DoT; он должен оставаться в package `DEPENDS`.
 - SOCKS5 checks должны поддерживать local DNS через `socks5://` и remote DNS через `socks5h://`.
 - Debug/log output должен оставаться локально в `/tmp/run/ipregion/`.

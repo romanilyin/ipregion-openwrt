@@ -5,7 +5,7 @@
 import * as fs from 'fs';
 import { cursor } from 'uci';
 
-const VERSION = '2026.9.1-1';
+const VERSION = '2026.9.1-2';
 const CATALOG_PATH = getenv('IPREGION_CATALOG_PATH') || '/usr/share/ipregion/services.json';
 const AI_CATALOG_PATH = getenv('IPREGION_AI_CATALOG_PATH') || '/usr/share/ipregion/services-ai.json';
 const DNS_CATALOG_PATH = getenv('IPREGION_DNS_CATALOG_PATH') || '/usr/share/ipregion/services-dns.json';
@@ -55,6 +55,7 @@ const DNS_STATUS_LABELS = {
 	dns_servfail: 'SERVFAIL',
 	dns_error: 'DNS error',
 	no_answer: 'No answer',
+	truncated: 'Truncated',
 	malformed_response: 'Malformed response',
 	unavailable: 'Unavailable'
 };
@@ -64,7 +65,7 @@ const VALID_IP_MODES = [ 'auto', 'ipv4', 'ipv6', 'both' ];
 const VALID_PROXY_DNS = [ 'local', 'remote' ];
 const VALID_AI_CATEGORIES = [ 'all', 'ai', 'ai_china' ];
 const VALID_GEOIP_MODES = [ 'lookup', 'route' ];
-const VALID_DNS_TRANSPORTS = [ 'both', 'doh', 'dot' ];
+const VALID_DNS_TRANSPORTS = [ 'all', 'plain', 'udp', 'tcp', 'both', 'doh', 'dot' ];
 const VALID_DNS_TYPES = [ 'A', 'AAAA' ];
 const IDENTITY_ENDPOINTS = [
 	'https://api64.ipify.org',
@@ -83,7 +84,7 @@ function usage() {
 		'       ipregion ai [OPTIONS]\n' +
 		'       ipregion dns [OPTIONS]\n' +
 		'\n' +
-		'IPRegion checks route regions, service endpoints and encrypted DNS availability.\n' +
+		'IPRegion checks route regions, service endpoints and DNS response integrity.\n' +
 		'\n' +
 		'Options:\n' +
 		'  -h, --help                 Show this help message\n' +
@@ -103,12 +104,12 @@ function usage() {
 		'      --lock FILE            Accepted for future locking; not enforced yet\n' +
 		'      --list-services        List service catalog\n' +
 		'      --list-ai-providers    List AI provider catalog\n' +
-		'      --list-dns-providers   List encrypted DNS provider catalog\n' +
+		'      --list-dns-providers   List DNS provider catalog\n' +
 		'      --service SERVICE_ID   Run only selected service, repeatable\n' +
 		'      --exclude SERVICE_ID   Exclude service, repeatable\n' +
 		'      --provider PROVIDER    AI mode: run one provider, repeatable\n' +
 		'      --category CATEGORY    AI mode: all, ai, or ai_china\n' +
-		'      --transport TRANSPORT  DNS mode: both, doh, or dot\n' +
+		'      --transport TRANSPORT  DNS mode: all, plain, udp, tcp, both, doh, or dot\n' +
 		'      --dns-name NAME        DNS mode: validated query name\n' +
 		'      --dns-type TYPE        DNS mode: A or AAAA\n' +
 		'      --safe                 AI mode: unauthenticated endpoint probe\n' +
@@ -271,7 +272,7 @@ function default_options() {
 		ai_category: 'all',
 		auth_check: false,
 		ai_providers: [],
-		dns_transport: 'both',
+		dns_transport: 'all',
 		dns_name: null,
 		dns_type: 'A',
 		dns_providers: [],
@@ -1980,15 +1981,18 @@ function parse_dns_message(data, expected_id, expected_name, expected_type) {
 		rcode_name: dns_rcode_name(rcode),
 		ad: (flags & 32) != 0,
 		ra: (flags & 128) != 0,
+		truncated: (flags & 512) != 0,
 		question: { name: question_name, type: expected_type },
 		answers: answers,
 		counts: { question: question_count, answer: answer_count, authority: authority_count, additional: additional_count }
 	};
 }
 
-function dns_status_for_response(response) {
+function dns_status_for_response(response, transport) {
 	if (response.error != null)
 		return 'malformed_response';
+	if (transport == 'udp' && response.truncated == true)
+		return 'truncated';
 	if (response.rcode == 3)
 		return 'dns_nxdomain';
 	if (response.rcode == 2)
@@ -2011,24 +2015,31 @@ function dns_network_status(exit_code, output) {
 
 function dns_diagnosis(status, transport) {
 	switch (status) {
-	case 'ok': return transport + ' returned a valid authenticated DNS response.';
+	case 'ok': return transport + (transport == 'UDP/53' || transport == 'TCP/53' ? ' returned a valid direct DNS response.' : ' returned a valid authenticated DNS response.');
 	case 'degraded': return transport + ' succeeded through a fallback resolver address.';
 	case 'timeout': return transport + ' did not respond before timeout; the endpoint or transport may be dropped.';
 	case 'certificate_failed': return transport + ' certificate validation failed; check system time or possible TLS interception.';
 	case 'tls_failed': return transport + ' TLS handshake failed.';
-	case 'connection_failed': return transport + ' TCP connection failed or was reset.';
+	case 'connection_failed': return transport + ' connection failed or was reset.';
 	case 'http_failed': return 'DoH returned an HTTP error.';
 	case 'dns_nxdomain': return 'The resolver returned NXDOMAIN for the probe name.';
 	case 'dns_servfail': return 'The resolver returned SERVFAIL for the probe name.';
 	case 'dns_error': return 'The resolver returned a DNS error response.';
 	case 'no_answer': return 'The resolver returned NOERROR without a usable answer.';
+	case 'truncated': return 'The UDP response was truncated and was not retried over TCP.';
 	case 'malformed_response': return 'The endpoint returned a malformed or mismatched DNS response.';
 	default: return 'The requested DNS transport is unavailable.';
 	}
 }
 
 function dns_transport_label(transport) {
+	if (transport == 'udp') return 'UDP/53';
+	if (transport == 'tcp') return 'TCP/53';
 	return transport == 'doh' ? 'DoH' : 'DoT';
+}
+
+function dns_transport_encrypted(transport) {
+	return transport == 'doh' || transport == 'dot';
 }
 
 function dns_row(provider, transport, ip_version, endpoint, status, response, latency_ms, attempts, detail) {
@@ -2038,12 +2049,13 @@ function dns_row(provider, transport, ip_version, endpoint, status, response, la
 		row_id: provider.id + '-' + transport + '-ipv' + ip_version,
 		transport: transport,
 		transport_label: dns_transport_label(transport),
+		encrypted: dns_transport_encrypted(transport),
 		ip_version: ip_version,
 		ip_label: 'IPv' + ip_version,
 		endpoint: endpoint,
 		status: status,
 		label: DNS_STATUS_LABELS[status] || status,
-		tls_verified: status != 'tls_failed' && status != 'certificate_failed' && status != 'connection_failed' && status != 'timeout' && status != 'unavailable',
+		tls_verified: dns_transport_encrypted(transport) ? status != 'tls_failed' && status != 'certificate_failed' && status != 'connection_failed' && status != 'timeout' && status != 'unavailable' : null,
 		rcode: response && response.rcode_name || null,
 		ad: response && response.ad == true,
 		answers: response && response.answers || [],
@@ -2102,7 +2114,7 @@ function curl_doh_probe(provider, opts, ip_version, endpoint, name, query_type) 
 		return { status: 'http_failed', response: null, latency_ms: latency_ms, detail: 'HTTP ' + http_code, remote_ip: marker_value(output, 'REMOTE_IP') };
 
 	let response = parse_dns_message(body, query_id, name, query_type);
-	return { status: dns_status_for_response(response), response: response, latency_ms: latency_ms, detail: response.error || null, remote_ip: marker_value(output, 'REMOTE_IP') };
+	return { status: dns_status_for_response(response, 'doh'), response: response, latency_ms: latency_ms, detail: response.error || null, remote_ip: marker_value(output, 'REMOTE_IP') };
 }
 
 function kdig_answer_value(record, query_type) {
@@ -2148,6 +2160,7 @@ function kdig_response(parsed, name, query_type) {
 		rcode_name: dns_rcode_name(int(parsed.RCODE)),
 		ad: parsed.AD == 1,
 		ra: parsed.RA == 1,
+		truncated: parsed.TC == 1,
 		question: { name: parsed.QNAME, type: parsed.QTYPEname },
 		answers: answers,
 		counts: { question: parsed.QDCOUNT, answer: parsed.ANCOUNT, authority: parsed.NSCOUNT, additional: parsed.ARCOUNT }
@@ -2181,14 +2194,14 @@ function interface_routes_endpoint(interface, source, endpoint, ip_version) {
 	return exit_code == 0 && index(output, ' dev ' + interface + ' ') >= 0;
 }
 
-function kdig_dot_probe(provider, opts, ip_version, endpoint, name, query_type) {
-	let args = [
-		'kdig', ip_version == 6 ? '-6' : '-4', '+json', '+tls-ca',
-		'+tls-hostname=' + provider.dot_hostname,
-		'+tls-sni=' + provider.dot_hostname,
-		'+timeout=' + opts.timeout,
-		'+retry=0'
-	];
+function kdig_probe(provider, transport, opts, ip_version, endpoint, name, query_type) {
+	let args = [ 'kdig', ip_version == 6 ? '-6' : '-4', '+json', '+timeout=' + opts.timeout, '+retry=0' ];
+	if (transport == 'udp')
+		push(args, '+ignore', '-p', '53');
+	else if (transport == 'tcp')
+		push(args, '+tcp', '-p', '53');
+	else
+		push(args, '+tls-ca', '+tls-hostname=' + provider.dot_hostname, '+tls-sni=' + provider.dot_hostname, '-p', '853');
 	let source = interface_source_address(opts.interface, ip_version);
 	if (opts.interface != null && source == null)
 		return { status: 'unavailable', response: null, latency_ms: null, detail: 'Interface has no IPv' + ip_version + ' address' };
@@ -2215,11 +2228,11 @@ function kdig_dot_probe(provider, opts, ip_version, endpoint, name, query_type) 
 	if (parsed == null)
 		return { status: 'malformed_response', response: null, latency_ms: latency_ms, detail: 'kdig output was not valid JSON' };
 	let response = kdig_response(parsed, name, query_type);
-	return { status: dns_status_for_response(response), response: response, latency_ms: latency_ms, detail: response.error || null };
+	return { status: dns_status_for_response(response, transport), response: response, latency_ms: latency_ms, detail: response.error || null };
 }
 
 function dns_status_succeeded(status) {
-	return status == 'ok' || status == 'degraded' || status == 'dns_nxdomain' || status == 'dns_servfail' || status == 'dns_error' || status == 'no_answer';
+	return status == 'ok' || status == 'degraded' || status == 'dns_nxdomain' || status == 'dns_servfail' || status == 'dns_error' || status == 'no_answer' || status == 'truncated';
 }
 
 function probe_dns_transport(provider, transport, opts, ip_version, name, query_type) {
@@ -2229,7 +2242,7 @@ function probe_dns_transport(provider, transport, opts, ip_version, name, query_
 	for (let endpoint in addresses) {
 		let attempt = transport == 'doh'
 			? curl_doh_probe(provider, opts, ip_version, endpoint, name, query_type)
-			: kdig_dot_probe(provider, opts, ip_version, endpoint, name, query_type);
+			: kdig_probe(provider, transport, opts, ip_version, endpoint, name, query_type);
 		push(attempts, { endpoint: endpoint, status: attempt.status, detail: attempt.detail || null, latency_ms: attempt.latency_ms });
 		last = attempt;
 		if (dns_status_succeeded(attempt.status)) {
@@ -2243,18 +2256,93 @@ function probe_dns_transport(provider, transport, opts, ip_version, name, query_
 	return dns_row(provider, transport, ip_version, addresses[length(addresses) - 1], last.status, last.response, last.latency_ms, attempts, last.detail);
 }
 
+function default_route_device(ip_version) {
+	let proc = fs.popen('ip ' + (ip_version == 6 ? '-6' : '-4') + ' route show default 2>/dev/null', 'r');
+	let output = proc ? proc.read('all') : '';
+	if (proc) proc.close();
+	let found = match(output, / dev ([A-Za-z0-9_.:-]+)/);
+	return found ? found[1] : null;
+}
+
+function add_interface_dns_address(addresses, value) {
+	value = trim_str(value || '');
+	let target = index(value, ':') >= 0 ? addresses.ipv6 : addresses.ipv4;
+	if (!match(value, index(value, ':') >= 0 ? /^[0-9A-Fa-f:]+$/ : /^[0-9.]+$/))
+		return;
+	for (let existing in target)
+		if (existing == value)
+			return;
+	push(target, value);
+}
+
+function interface_dns_addresses(opts) {
+	let addresses = { ipv4: [], ipv6: [] };
+	let proc = fs.popen('ubus call network.interface dump 2>/dev/null', 'r');
+	let output = proc ? proc.read('all') : '';
+	if (proc) proc.close();
+	let dump = parse_json_safe(output);
+	let dump_available = type(dump) == 'object' && type(dump.interface) == 'array';
+	let default4 = opts.interface == null ? default_route_device(4) : null;
+	let default6 = opts.interface == null ? default_route_device(6) : null;
+
+	for (let entry in dump_available ? dump.interface : []) {
+		let device = entry.l3_device || entry.device || '';
+		let matched = opts.interface != null
+			? opts.interface == entry.interface || opts.interface == device || opts.interface == entry.device
+			: device == default4 || device == default6;
+		if (!matched || entry.up == false)
+			continue;
+		for (let address in entry['dns-server'] || [])
+			add_interface_dns_address(addresses, address);
+	}
+
+	if (opts.interface == null && !dump_available && !length(addresses.ipv4) && !length(addresses.ipv6)) {
+		let resolv = fs.readfile('/tmp/resolv.conf.d/resolv.conf.auto') || '';
+		for (let line in split(resolv, '\n')) {
+			let found = match(trim_str(line), /^nameserver[ \t]+([0-9A-Fa-f:.]+)$/);
+			if (found)
+				add_interface_dns_address(addresses, found[1]);
+		}
+	}
+
+	return addresses;
+}
+
+function resolve_dns_provider(provider, opts) {
+	if (provider.dynamic != 'interface')
+		return provider;
+	let addresses = interface_dns_addresses(opts);
+	return merge_object(merge_object({}, provider), addresses);
+}
+
 function selected_dns_providers(catalog, opts) {
 	let selected = [];
+	let explicit = length(opts.dns_providers) > 0;
 	for (let provider in catalog.providers)
-		if (provider.default_enabled != false && (length(opts.dns_providers) == 0 || contains(opts.dns_providers, provider.id)))
-			push(selected, provider);
+		if (provider.default_enabled != false && (!explicit || contains(opts.dns_providers, provider.id))) {
+			let resolved = resolve_dns_provider(provider, opts);
+			if (provider.dynamic != 'interface' || explicit || length(resolved.ipv4 || []) || length(resolved.ipv6 || []))
+				push(selected, resolved);
+		}
 	return selected;
 }
 
 function dns_transports(opts) {
+	if (opts.dns_transport == 'all') return [ 'udp', 'tcp', 'doh', 'dot' ];
+	if (opts.dns_transport == 'plain') return [ 'udp', 'tcp' ];
+	if (opts.dns_transport == 'udp') return [ 'udp' ];
+	if (opts.dns_transport == 'tcp') return [ 'tcp' ];
 	if (opts.dns_transport == 'doh') return [ 'doh' ];
 	if (opts.dns_transport == 'dot') return [ 'dot' ];
 	return [ 'doh', 'dot' ];
+}
+
+function dns_provider_transports(provider, opts) {
+	let result = [];
+	for (let transport in dns_transports(opts))
+		if (provider.plain_only != true || !dns_transport_encrypted(transport))
+			push(result, transport);
+	return result;
 }
 
 function dns_ip_versions(opts) {
@@ -2331,12 +2419,25 @@ function dns_answers_equal(left, right) {
 	return true;
 }
 
-function dns_summary(rows) {
-	let summary = { status: 'ok', passed: 0, failed: 0, doh_passed: 0, dot_passed: 0, findings: [], finding_details: [] };
+function dns_summary(rows, complete) {
+	let summary = {
+		status: 'ok',
+		passed: 0,
+		failed: 0,
+		udp_passed: 0,
+		tcp_passed: 0,
+		doh_passed: 0,
+		dot_passed: 0,
+		findings: [],
+		finding_details: [],
+		interception: { status: complete ? 'not_run' : 'pending', compared_pairs: 0, likely_pairs: 0, inconclusive_pairs: 0, details: [] }
+	};
 	let pairs = {};
 	for (let row in rows) {
 		let passed = dns_status_succeeded(row.status);
 		if (passed) summary.passed++; else summary.failed++;
+		if (passed && row.transport == 'udp') summary.udp_passed++;
+		if (passed && row.transport == 'tcp') summary.tcp_passed++;
 		if (passed && row.transport == 'doh') summary.doh_passed++;
 		if (passed && row.transport == 'dot') summary.dot_passed++;
 		let key = row.id + '-ipv' + row.ip_version;
@@ -2346,6 +2447,17 @@ function dns_summary(rows) {
 
 	for (let key in pairs) {
 		let pair = pairs[key];
+		let udp_ok = pair.udp && dns_status_succeeded(pair.udp.status);
+		let tcp_ok = pair.tcp && dns_status_succeeded(pair.tcp.status);
+		if (pair.udp && !udp_ok) {
+			push(summary.findings, pair.name + ' ' + pair.ip_label + ': UDP/53 is unavailable.');
+			push(summary.finding_details, { code: 'udp_unavailable', name: pair.name, ip_label: pair.ip_label });
+		}
+		if (pair.tcp && !tcp_ok) {
+			push(summary.findings, pair.name + ' ' + pair.ip_label + ': TCP/53 is unavailable.');
+			push(summary.finding_details, { code: 'tcp_unavailable', name: pair.name, ip_label: pair.ip_label });
+		}
+
 		if (pair.doh && pair.dot) {
 			let doh_ok = dns_status_succeeded(pair.doh.status);
 			let dot_ok = dns_status_succeeded(pair.dot.status);
@@ -2370,6 +2482,77 @@ function dns_summary(rows) {
 				push(summary.finding_details, { code: 'both_unavailable', name: pair.name, ip_label: pair.ip_label });
 			}
 		}
+
+		if (!complete || (!pair.udp && !pair.tcp) || (!pair.doh && !pair.dot))
+			continue;
+
+		let authenticated = [];
+		if (pair.doh && dns_status_succeeded(pair.doh.status) && pair.doh.rcode != null)
+			push(authenticated, pair.doh);
+		if (pair.dot && dns_status_succeeded(pair.dot.status) && pair.dot.rcode != null)
+			push(authenticated, pair.dot);
+
+		let comparison_valid = udp_ok && tcp_ok && pair.udp.rcode != null && pair.tcp.rcode != null && length(authenticated) > 0;
+		let baseline = length(authenticated) ? authenticated[0] : null;
+		if (comparison_valid && (pair.udp.endpoint != pair.tcp.endpoint || pair.udp.endpoint != baseline.endpoint))
+			comparison_valid = false;
+		for (let row in authenticated)
+			if (row.endpoint != baseline.endpoint || row.rcode != baseline.rcode)
+				comparison_valid = false;
+
+		if (!comparison_valid) {
+			summary.interception.inconclusive_pairs++;
+			continue;
+		}
+
+		summary.interception.compared_pairs++;
+		let udp_matches = pair.udp.rcode == baseline.rcode;
+		let tcp_matches = pair.tcp.rcode == baseline.rcode;
+		let likely_code = null;
+		let likely_message = null;
+		if (!udp_matches && tcp_matches) {
+			likely_code = 'likely_udp_dns_interception';
+			likely_message = 'UDP/53 returned a different DNS response code while TCP/53 matched authenticated DNS; UDP interception is likely.';
+		}
+		else if (udp_matches && !tcp_matches) {
+			likely_code = 'likely_tcp_dns_interception';
+			likely_message = 'TCP/53 returned a different DNS response code while UDP/53 matched authenticated DNS; TCP interception is likely.';
+		}
+		else if (!udp_matches && !tcp_matches && pair.udp.rcode == pair.tcp.rcode) {
+			likely_code = 'likely_plain_dns_interception';
+			likely_message = 'UDP/53 and TCP/53 agree with each other but differ from authenticated DNS; plain DNS interception is likely.';
+		}
+
+		if (likely_code != null) {
+			summary.interception.likely_pairs++;
+			push(summary.findings, pair.name + ' ' + pair.ip_label + ': ' + likely_message);
+			push(summary.finding_details, { code: likely_code, name: pair.name, ip_label: pair.ip_label });
+			push(summary.interception.details, { code: likely_code, id: key });
+			continue;
+		}
+
+		let answers_match = udp_matches && tcp_matches && dns_answers_equal(pair.udp.answers, baseline.answers) && dns_answers_equal(pair.tcp.answers, baseline.answers);
+		for (let row in authenticated)
+			if (!dns_answers_equal(row.answers, baseline.answers))
+				answers_match = false;
+
+		if (!udp_matches || !tcp_matches || !answers_match) {
+			summary.interception.inconclusive_pairs++;
+			if (udp_matches && tcp_matches) {
+				let message = 'Plain and authenticated DNS returned different answers; resolver or CDN variation may be legitimate.';
+				push(summary.findings, pair.name + ' ' + pair.ip_label + ': ' + message);
+				push(summary.finding_details, { code: 'plain_answer_mismatch', name: pair.name, ip_label: pair.ip_label });
+			}
+		}
+	}
+
+	if (complete) {
+		if (summary.interception.likely_pairs > 0)
+			summary.interception.status = 'likely';
+		else if (summary.interception.inconclusive_pairs > 0)
+			summary.interception.status = 'inconclusive';
+		else if (summary.interception.compared_pairs > 0)
+			summary.interception.status = 'no_mismatch_detected';
 	}
 
 	if (summary.failed > 0)
@@ -2384,38 +2567,48 @@ function dns_result_failed(result) {
 function build_dns_result(opts, catalog) {
 	let start = clock(true);
 	let providers = selected_dns_providers(catalog, opts);
-	let transports = dns_transports(opts);
 	let versions = dns_ip_versions(opts);
 	let name = opts.dns_name || catalog.default_probe_name || 'example.com';
 	let query_type = opts.dns_type || catalog.default_probe_type || 'A';
 	let result = {
-		version: 1,
+		version: 2,
 		mode: 'dns',
 		generated_at: now_iso(),
 		duration_ms: 0,
 		request: { providers: opts.dns_providers, transport: opts.dns_transport, name: name, type: query_type, ip_mode: opts.ip_mode, interface: opts.interface, timeout: opts.timeout },
 		probes: [],
-		summary: { status: 'ok', passed: 0, failed: 0, doh_passed: 0, dot_passed: 0, findings: [], finding_details: [] },
+		summary: dns_summary([], false),
 		errors: []
 	};
 
 	if (length(providers) == 0)
 		push(result.errors, { code: 'no_dns_providers', message: 'No DNS providers matched the requested filters' });
-	if (fs.access('/usr/bin/kdig', 'x') != true && contains(transports, 'dot'))
-		push(result.errors, { code: 'kdig_missing', message: 'kdig is required for DNS-over-TLS checks' });
 
-	let total = length(providers) * length(transports) * length(versions);
+	let total = 0;
+	let kdig_required = false;
+	for (let provider in providers) {
+		let provider_transports = dns_provider_transports(provider, opts);
+		total += length(provider_transports) * length(versions);
+		for (let transport in provider_transports)
+			if (transport != 'doh')
+				kdig_required = true;
+	}
+	if (total == 0)
+		push(result.errors, { code: 'no_compatible_dns_transports', message: 'No selected DNS provider supports the requested transport' });
+	if (kdig_required && fs.access('/usr/bin/kdig', 'x') != true)
+		push(result.errors, { code: 'kdig_missing', message: 'kdig is required for UDP, TCP and DNS-over-TLS checks' });
 	update_dns_state({ running: true, started_at: result.generated_at, mode: 'dns', finished: 0, total: total });
 	write_partial_output(opts, result);
 
 	for (let provider in providers)
-		for (let transport in transports)
+		for (let transport in dns_provider_transports(provider, opts))
 			for (let ip_version in versions) {
 				update_dns_state({ running: true, current: (provider.name || provider.id) + ' / ' + dns_transport_label(transport) + ' / IPv' + ip_version, current_id: provider.id + '-' + transport + '-' + ip_version, finished: length(result.probes), total: total });
 				push(result.probes, probe_dns_transport(provider, transport, opts, ip_version, name, query_type));
-				result.summary = dns_summary(result.probes);
+				result.summary = dns_summary(result.probes, false);
 				write_partial_output(opts, result);
 			}
+	result.summary = dns_summary(result.probes, true);
 
 	let end = clock(true);
 	if (type(start) == 'array' && type(end) == 'array')
@@ -2774,6 +2967,7 @@ function print_plain_dns_result(result) {
 			push(values, answer.value);
 		printf('  %s\t%s\t%s\t%s\t%s\n', row.name, row.transport_label, row.ip_label, row.label, length(values) ? join(', ', values) : row.diagnosis);
 	}
+	printf('\nInterception check: %s\n', result.summary.interception && result.summary.interception.status || 'not_run');
 
 	if (length(result.summary.findings || [])) {
 		printf('\nFindings:\n');

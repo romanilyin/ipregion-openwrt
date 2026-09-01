@@ -42,6 +42,23 @@
       "dot_hostname": "unfiltered.adguard-dns.com",
       "ipv4": ["94.140.14.140", "94.140.14.141"],
       "ipv6": ["2a10:50c0::1:ff", "2a10:50c0::2:ff"]
+    },
+    {
+      "id": "yandex",
+      "name": "Yandex DNS (basic)",
+      "default_enabled": true,
+      "doh_url": "https://common.dot.dns.yandex.net/dns-query",
+      "doh_hostname": "common.dot.dns.yandex.net",
+      "dot_hostname": "common.dot.dns.yandex.net",
+      "ipv4": ["77.88.8.8", "77.88.8.1"],
+      "ipv6": ["2a02:6b8::feed:0ff", "2a02:6b8:0:1::feed:0ff"]
+    },
+    {
+      "id": "interface_dns",
+      "name": "DNS from active interface",
+      "default_enabled": true,
+      "dynamic": "interface",
+      "plain_only": true
     }
   ]
 }

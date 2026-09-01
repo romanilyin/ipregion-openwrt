@@ -27,9 +27,6 @@ msgstr ""
 msgid "AI provider check started"
 msgstr ""
 
-msgid "AI provider checks use the same IP mode, interface, proxy and timeout controls above."
-msgstr ""
-
 msgid "AI provider endpoint results"
 msgstr ""
 
@@ -45,9 +42,6 @@ msgstr ""
 msgid "Auto-detect reference country"
 msgstr ""
 
-msgid "Cache TTL"
-msgstr ""
-
 msgid "CDN services"
 msgstr ""
 
@@ -55,9 +49,6 @@ msgid "CDN services check which CDN edge or region the router reaches, for examp
 msgstr ""
 
 msgid "Category"
-msgstr ""
-
-msgid "Check how GeoIP, streaming and CDN services detect this router."
 msgstr ""
 
 msgid "Check how GeoIP, streaming, CDN and AI services detect this router."
@@ -69,16 +60,10 @@ msgstr ""
 msgid "Check service-visible route"
 msgstr ""
 
-msgid "Check whether popular AI API endpoints are reachable through this router, interface or SOCKS5 proxy."
-msgstr ""
-
 msgid "Check whether popular AI API endpoints are reachable through the selected route."
 msgstr ""
 
 msgid "China and Asia AI providers"
-msgstr ""
-
-msgid "Clear cache"
 msgstr ""
 
 msgid "Close"
@@ -112,9 +97,6 @@ msgid "Download JSON"
 msgstr ""
 
 msgid "Diagnosis"
-msgstr ""
-
-msgid "Enable"
 msgstr ""
 
 msgid "Each row checks the actual provider endpoint domain. With split routing, this can differ from the generic egress check below."
@@ -162,9 +144,6 @@ msgstr ""
 msgid "IP Region check started"
 msgstr ""
 
-msgid "IP"
-msgstr ""
-
 msgid "ISO 3166-1 alpha-2 country code used to highlight country values. Matching countries are orange; different countries are blue."
 msgstr ""
 
@@ -201,9 +180,6 @@ msgstr ""
 msgid "IPv6 value/status"
 msgstr ""
 
-msgid "Keep logs"
-msgstr ""
-
 msgid "Last check"
 msgstr ""
 
@@ -220,9 +196,6 @@ msgid "Log is empty"
 msgstr ""
 
 msgid "Mask IP addresses in UI"
-msgstr ""
-
-msgid "Max parallel checks"
 msgstr ""
 
 msgid "N/A"
@@ -298,9 +271,6 @@ msgid "Runtime log"
 msgstr ""
 
 msgid "Runtime state"
-msgstr ""
-
-msgid "Saved SOCKS5 proxy"
 msgstr ""
 
 msgid "Safe mode is used by default. It does not store API keys and only checks whether provider endpoint domains are reachable through their selected routes."
@@ -405,19 +375,10 @@ msgstr ""
 msgid "Use saved SOCKS5 proxy"
 msgstr ""
 
-msgid "A successful encrypted DNS check does not prove that ordinary UDP or TCP port 53 is free from interception."
-msgstr ""
-
 msgid "Answer"
 msgstr ""
 
-msgid "Check whether major public DNS resolvers are reachable over authenticated DoH and DoT connections."
-msgstr ""
-
 msgid "DNS Security"
-msgstr ""
-
-msgid "DNS checks use the IP mode, interface and timeout controls above. DoH binds to the selected interface; DoT binds to its source address. SOCKS5 proxy routing is not used."
 msgstr ""
 
 msgid "DNS provider"
@@ -436,24 +397,6 @@ msgid "DNS security summary"
 msgstr ""
 
 msgid "DNS status"
-msgstr ""
-
-msgid "DoH and DoT"
-msgstr ""
-
-msgid "DoH and DoT connect directly to published resolver IP addresses and verify the provider TLS hostname."
-msgstr ""
-
-msgid "DoH only"
-msgstr ""
-
-msgid "DoT only"
-msgstr ""
-
-msgid "Encrypted DNS results"
-msgstr ""
-
-msgid "Encrypted DNS transport"
 msgstr ""
 
 msgid "Endpoint"
@@ -543,7 +486,7 @@ msgstr ""
 msgid "TLS handshake failed."
 msgstr ""
 
-msgid "TCP connection failed or was reset."
+msgid "Connection failed or was reset."
 msgstr ""
 
 msgid "DoH returned an HTTP error."
@@ -600,5 +543,65 @@ msgstr ""
 msgid "No DNS providers matched the requested filters"
 msgstr ""
 
-msgid "kdig is required for DNS-over-TLS checks"
+msgid "No selected DNS provider supports the requested transport"
+msgstr ""
+
+msgid "Truncated"
+msgstr ""
+
+msgid "returned a valid direct DNS response."
+msgstr ""
+
+msgid "The UDP response was truncated and was not retried over TCP."
+msgstr ""
+
+msgid "UDP/53 is unavailable."
+msgstr ""
+
+msgid "TCP/53 is unavailable."
+msgstr ""
+
+msgid "Plain and authenticated DNS returned different answers; resolver or CDN variation may be legitimate."
+msgstr ""
+
+msgid "UDP/53 returned a different DNS response code while TCP/53 matched authenticated DNS; UDP interception is likely."
+msgstr ""
+
+msgid "TCP/53 returned a different DNS response code while UDP/53 matched authenticated DNS; TCP interception is likely."
+msgstr ""
+
+msgid "UDP/53 and TCP/53 agree with each other but differ from authenticated DNS; plain DNS interception is likely."
+msgstr ""
+
+msgid "Likely DNS interception"
+msgstr ""
+
+msgid "No DNS response mismatch detected"
+msgstr ""
+
+msgid "Interception check inconclusive"
+msgstr ""
+
+msgid "Interception comparison pending"
+msgstr ""
+
+msgid "Interception comparison not run"
+msgstr ""
+
+msgid "kdig is required for UDP, TCP and DNS-over-TLS checks"
+msgstr ""
+
+msgid "DNS results"
+msgstr ""
+
+msgid "One run checks direct UDP/53, TCP/53, DoH and DoT responses in the same table. TLS hostnames are verified for encrypted transports."
+msgstr ""
+
+msgid "The single DNS run checks UDP/53, TCP/53, DoH and DoT using the IP mode, interface and timeout controls above. SOCKS5 proxy routing is not used."
+msgstr ""
+
+msgid "Matching responses mean no mismatch was detected; they do not prove that interception is absent."
+msgstr ""
+
+msgid "Compare UDP/53, TCP/53, DoH and DoT responses from public and active-interface DNS resolvers in one check."
 msgstr ""
