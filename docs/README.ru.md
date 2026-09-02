@@ -35,7 +35,7 @@ IPRegion запускает диагностику на самом роутер�
 - GeoIP-проверки показывают, какую страну публичные геолокационные API назначают маршруту.
 - Проверки популярных сервисов показывают регион, доступ, rate-limit или отказ от крупных платформ.
 - CDN-проверки показывают, до какого CDN edge или региона доходит роутер.
-- AI-проверки безопасно проверяют реальные домены AI API endpoint-ов без авторизации.
+- AI-проверки безопасно проверяют реальные домены web- и API-endpoint-ов AI без авторизации.
 - Проверки безопасности DNS сравнивают ответы UDP/53, TCP/53, DoH и DoT от Google, Cloudflare, Quad9, AdGuard DNS и Яндекс DNS; при наличии также проверяется открытый DNS активного интерфейса.
 - Проверки могут идти через маршрут по умолчанию, выбранный OpenWrt-интерфейс или SOCKS5-прокси.
 
@@ -75,7 +75,7 @@ Installer скачивает `ipregion*.apk`, `luci-app-ipregion*.apk` и `luci-
 
 Опции APK installer:
 
-- `IPREGION_RELEASE=2026.9.1-2`: поставить конкретный GitHub release tag вместо `latest`.
+- `IPREGION_RELEASE=2026.9.2-1`: поставить конкретный GitHub release tag вместо `latest`.
 - `IPREGION_INSTALL_LUCI=0`: поставить только CLI/backend пакет.
 - `IPREGION_APK_UPDATE=0`: не запускать `apk update` перед установкой.
 - `IPREGION_DOWNLOAD_RETRIES=5`: увеличить число повторов для GitHub metadata и APK downloads.
@@ -83,7 +83,7 @@ Installer скачивает `ipregion*.apk`, `luci-app-ipregion*.apk` и `luci-
 Пример с фиксированным release:
 
 ```sh
-wget -qO- https://raw.githubusercontent.com/romanilyin/ipregion-openwrt/main/install.sh | IPREGION_RELEASE=2026.9.1-2 sh
+wget -qO- https://raw.githubusercontent.com/romanilyin/ipregion-openwrt/main/install.sh | IPREGION_RELEASE=2026.9.2-1 sh
 ```
 
 Ручная установка скачанных APK:
@@ -114,11 +114,11 @@ opkg install ./ipregion*.ipk ./luci-app-ipregion*.ipk ./luci-i18n-ipregion-ru*.i
 
 - Запускайте GeoIP, popular service, CDN, единую проверку целостности DNS и AI endpoint проверки с одной страницы.
 - Выбирайте IP mode, interface, SOCKS5 proxy, timeout и GeoIP mode.
-- Настройте сохраненный SOCKS5 proxy в `Services -> IP Region`, затем выберите его на странице Status.
+- Настройте несколько профилей SOCKS5 proxy в `Services -> IP Region`, включая локальный или удаленный DNS для каждого профиля, затем выбирайте нужный профиль на странице Status.
 - Задавайте реальную страну, чтобы совпадающие значения подсвечивались оранжевым, а отличающиеся - синим.
 - AI-проверки показывают отдельные строки IPv4 и IPv6 для каждого провайдера в режиме `IPv4 и IPv6`; недоступные транспорты отображаются явно.
 - Смотрите прогресс во время выполнения.
-- Скачивайте JSON результата. JSON содержит исходные IP-адреса.
+- Скачивайте исходный JSON или копируйте безопасные для публикации Markdown-таблицы. Markdown не содержит исходные IP-адреса, endpoint-ы прокси и идентификаторы маршрута.
 - Обновляйте пакет из GitHub Releases через карточку версии; защита от downgrade не даст установить более старый latest release.
 - Откройте `Services -> IP Region` для UCI-настроек по умолчанию.
 
@@ -136,6 +136,7 @@ ipregion --interface wan --group primary --json
 ipregion --proxy 127.0.0.1:1080 --proxy-dns remote --group custom --json
 ipregion ai --json
 ipregion ai --provider google_gemini --json
+ipregion ai --provider google_gemini_web --json
 ipregion dns --json
 ipregion dns --provider google --transport all --ip-mode ipv4 --json
 ipregion dns --provider interface_dns --transport plain --ip-mode ipv4 --json
@@ -149,7 +150,7 @@ ipregion dns --provider interface_dns --transport plain --ip-mode ipv4 --json
 - `--group cdn`: CDN-сервисы.
 - `--geoip-mode lookup`: сначала определить egress IP роутера, затем попросить GeoIP API проверить этот IP.
 - `--geoip-mode route`: спросить поддерживаемые GeoIP API, какую страну они видят для самого запроса.
-- `ipregion ai --json`: безопасно проверить AI provider endpoint-ы без хранения или запроса API-ключей.
+- `ipregion ai --json`: безопасно проверить web/API endpoint-ы AI-провайдеров без хранения или запроса API-ключей.
 - `ipregion ai --ip-mode both --json`: проверить каждого выбранного AI-провайдера отдельными IPv4 и IPv6 probe.
 - `ipregion dns --json`: одной командой проверить UDP/53, TCP/53, DoH и DoT и сравнить коды и содержимое ответов.
 - `ipregion dns --dns-name example.com --dns-type A --json`: проверить все DNS-транспорты для валидированного доменного имени и типа записи.
@@ -163,6 +164,7 @@ ipregion dns --provider interface_dns --transport plain --ip-mode ipv4 --json
 ## Примечания
 
 - `401`, `403`, `404`, `405` и `429` в AI mode могут означать, что endpoint достигнут; DNS, TLS, timeout и network failures классифицируются отдельно.
+- Google Gemini Web использует `gemini.google.com`, а отдельная проверка Gemini API использует `generativelanguage.googleapis.com`. Domain-based split routing должен охватывать каждый hostname, который требуется направлять в VPN.
 - Проверки публичных DNS подключаются к опубликованным IP резолверов; DoH и DoT дополнительно проверяют TLS-имя провайдера. DNS-адреса интерфейса читаются из выбранного или активного default-интерфейса OpenWrt и проверяются только через UDP/TCP.
 - DNS mode игнорирует сохраненный в UCI proxy и отклоняет явный `--proxy`; DoH привязывается к выбранному интерфейсу, а UDP, TCP и DoT - к исходному адресу этого интерфейса.
 - DNS mode `auto` предпочитает доступный IPv4 default route и переключается на IPv6 на IPv6-only роутерах; для явной проверки обоих используйте `--ip-mode both`.

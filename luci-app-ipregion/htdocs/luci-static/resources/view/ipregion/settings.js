@@ -3,6 +3,7 @@
 'require form';
 'require rpc';
 'require ui';
+'require uci';
 
 var callDetectedCountry = rpc.declare({ object: 'luci.ipregion', method: 'detected_country', expect: { '': {} } });
 
@@ -22,8 +23,15 @@ function setReferenceCountry(section_id, value) {
 }
 
 return view.extend({
+	load: function() {
+		return uci.load('ipregion');
+	},
+
 	render: function() {
-		var m, s, o;
+		var m, s, p, o;
+		var profiles = uci.sections('ipregion', 'proxy') || [];
+		var legacyProxy = uci.get('ipregion', 'main', 'proxy') || '';
+		var selectedProxy = uci.get('ipregion', 'main', 'proxy_profile') || (legacyProxy ? 'legacy' : 'none');
 		var groupHelp = [
 			_('All groups run every enabled GeoIP, popular service and CDN check.'),
 			_('GeoIP services query public geolocation APIs and registries to see what country they assign to the router IP.'),
@@ -92,19 +100,22 @@ return view.extend({
 		o.datatype = 'range(0,5)';
 		o.default = '1';
 
-		o = s.option(form.Value, 'proxy', _('SOCKS5 proxy'));
-		o.placeholder = '127.0.0.1:1080';
-		o.datatype = 'maxlength(255)';
-		o.description = _('Saved proxy shown on Status page. Enter host:port without socks5:// prefix, for example 127.0.0.1:1080.');
-		o.validate = function(section_id, value) {
-			return !value || /^[A-Za-z0-9_.-]+:[0-9]+$/.test(value) ? true : _('SOCKS5 proxy must be host:port, for example 127.0.0.1:1080');
-		};
-
-		o = s.option(form.ListValue, 'proxy_dns', _('SOCKS5 DNS mode'));
-		o.value('remote', _('Remote DNS'));
-		o.value('local', _('Local DNS'));
-		o.description = _('Remote DNS uses socks5h:// and resolves names through the proxy. Local DNS uses socks5:// and resolves names on the router.');
-		o.default = 'remote';
+		o = s.option(form.ListValue, 'proxy_profile', _('Default SOCKS5 proxy profile'));
+		o.value('none', _('No proxy'));
+		var selectedProxyFound = selectedProxy === 'none';
+		if (legacyProxy)
+			o.value('legacy', _('Legacy SOCKS5 proxy'));
+		if (legacyProxy && selectedProxy === 'legacy')
+			selectedProxyFound = true;
+		profiles.forEach(function(profile) {
+			o.value(profile['.name'], profile.label || profile['.name']);
+			if (profile['.name'] === selectedProxy)
+				selectedProxyFound = true;
+		});
+		if (!selectedProxyFound)
+			o.value(selectedProxy, _('Selected SOCKS5 proxy profile does not exist or is invalid') + ' (' + selectedProxy + ')');
+		o.description = _('Used by default for GeoIP, service and AI checks. New profiles appear here after the settings are saved and reloaded.');
+		o.default = legacyProxy ? 'legacy' : 'none';
 
 		o = s.option(form.Value, 'interface', _('Interface'));
 		o.placeholder = _('Default route');
@@ -121,6 +132,53 @@ return view.extend({
 
 		o = s.option(form.Flag, 'debug', _('Debug logging'));
 		o.default = '0';
+
+		p = m.section(form.GridSection, 'proxy', _('SOCKS5 proxy profiles'));
+		p.description = _('Define multiple SOCKS5 endpoints, for example Podkop mixed proxies, and select any profile on the Status page.');
+		p.addremove = true;
+		p.anonymous = false;
+		p.sortable = true;
+		p.nodescriptions = true;
+		p.renderSectionAdd = function() {
+			var node = form.GridSection.prototype.renderSectionAdd.apply(this, arguments);
+			var input = node.querySelector('.cbi-section-create-name');
+
+			ui.addValidator(input, 'uciname', false, function(value) {
+				if (!value)
+					return _('Profile ID is required');
+				if (value === 'none' || value === 'legacy')
+					return _('Profile IDs none and legacy are reserved');
+				if (uci.sections('ipregion').some(function(section) { return section['.name'] === value; }))
+					return _('A configuration section with this ID already exists');
+
+				return true;
+			}, 'blur', 'keyup');
+			return node;
+		};
+
+		o = p.option(form.Value, 'label', _('Profile name'));
+		o.placeholder = _('VPN Europe');
+		o.datatype = 'maxlength(64)';
+		o.rmempty = false;
+		o.validate = function(section_id, value) {
+			return value && value.trim() ? true : _('Profile name is required');
+		};
+
+		o = p.option(form.Value, 'address', _('SOCKS5 proxy'));
+		o.placeholder = '192.168.1.1:1080';
+		o.datatype = 'maxlength(255)';
+		o.rmempty = false;
+		o.validate = function(section_id, value) {
+			var match = String(value || '').match(/^[A-Za-z0-9_.-]+:([0-9]+)$/);
+			var port = match ? Number(match[1]) : 0;
+			return match && port >= 1 && port <= 65535 ? true : _('SOCKS5 proxy must be host:port with a port from 1 to 65535');
+		};
+
+		o = p.option(form.ListValue, 'proxy_dns', _('SOCKS5 DNS mode'));
+		o.value('remote', _('Remote DNS'));
+		o.value('local', _('Local DNS'));
+		o.description = _('Remote DNS uses socks5h:// and resolves names through the proxy. Local DNS uses socks5:// and resolves names on the router.');
+		o.default = 'remote';
 
 		return m.render().then(function(node) {
 			return E('div', {}, [

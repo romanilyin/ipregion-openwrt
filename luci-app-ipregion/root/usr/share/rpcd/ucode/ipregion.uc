@@ -55,7 +55,15 @@ function valid_token(value) {
 }
 
 function valid_proxy(value) {
-	return value == null || value == '' || match(value, /^[A-Za-z0-9_.-]+:[0-9]+$/) != null;
+	if (value == null || value == '')
+		return true;
+
+	if (type(value) != 'string' || match(value, /^[A-Za-z0-9_.-]+:[0-9]+$/) == null)
+		return false;
+
+	let pos = rindex(value, ':');
+	let port = int(substr(value, pos + 1));
+	return port == port && port >= 1 && port <= 65535;
 }
 
 function trim_str(value) {
@@ -217,7 +225,38 @@ function clear_dns_temp_files() {
 			fs.unlink(RUN_DIR + '/' + entry);
 }
 
-function current_config() {
+function configured_proxy_profiles(uci, cfg) {
+	let profiles = [];
+	let legacy_address = trim_str(cfg.proxy || '');
+	let legacy_dns = cfg.proxy_dns || 'remote';
+
+	if (legacy_address != '' && valid_proxy(legacy_address) && (legacy_dns == 'local' || legacy_dns == 'remote'))
+		push(profiles, { id: 'legacy', label: 'Legacy SOCKS5 proxy', address: legacy_address, proxy_dns: legacy_dns });
+
+	uci.foreach('ipregion', 'proxy', function(section) {
+		let id = section['.name'];
+		let address = trim_str(section.address || '');
+		let proxy_dns = section.proxy_dns || 'remote';
+		let label = trim_str(section.label || id || '');
+
+		if (!valid_token(id) || id == 'none' || id == 'legacy' || address == '' || !valid_proxy(address))
+			return;
+
+		if (proxy_dns != 'local' && proxy_dns != 'remote')
+			return;
+
+		if (label == '')
+			label = id;
+		if (length(label) > 64)
+			label = substr(label, 0, 64);
+
+		push(profiles, { id: id, label: label, address: address, proxy_dns: proxy_dns });
+	});
+
+	return profiles;
+}
+
+function load_config_state() {
 	let defaults = {
 		enabled: '1',
 		group: 'all',
@@ -227,6 +266,7 @@ function current_config() {
 		timeout: '5',
 		retries: '1',
 		proxy: '',
+		proxy_profile: 'none',
 		proxy_dns: 'remote',
 		interface: '',
 		mask_ip: '1',
@@ -237,19 +277,79 @@ function current_config() {
 		disabled_service: [ 'GOOGLE_SEARCH_CAPTCHA' ]
 	};
 
-	let uci = cursor();
+	let config_dir = getenv('IPREGION_UCI_CONFIG_DIR');
+	let uci = config_dir != null && config_dir != '' ? cursor(config_dir) : cursor();
 	if (uci == null || uci.load('ipregion') == null)
-		return defaults;
+		return { config: defaults, profiles: [] };
 
 	let cfg = uci.get_all('ipregion', 'main');
 	if (type(cfg) != 'object')
-		return defaults;
+		return { config: defaults, profiles: [] };
+
+	let selected_profile = cfg.proxy_profile;
 
 	for (let key in defaults)
 		if (cfg[key] == null)
 			cfg[key] = defaults[key];
 
+	let profiles = configured_proxy_profiles(uci, cfg);
+	if (selected_profile == null || selected_profile == '')
+		cfg.proxy_profile = cfg.proxy != '' ? 'legacy' : 'none';
+
+	return { config: cfg, profiles: profiles };
+}
+
+function current_config() {
+	let state = load_config_state();
+	let cfg = state.config;
+	let public_profiles = [];
+
+	for (let profile in state.profiles)
+		push(public_profiles, { id: profile.id, label: profile.label, proxy_dns: profile.proxy_dns });
+
+	cfg.proxy_profiles = public_profiles;
 	return cfg;
+}
+
+function find_proxy_profile(profiles, id) {
+	for (let profile in profiles)
+		if (profile.id == id)
+			return profile;
+
+	return null;
+}
+
+function resolved_proxy(input, state, ignore_proxy) {
+	if (ignore_proxy)
+		return { proxy: '', proxy_dns: 'remote', proxy_profile: 'none' };
+
+	input = input || {};
+	let cfg = state.config;
+	let requested_profile = input.proxy_profile;
+
+	if (requested_profile != null) {
+		if (type(requested_profile) != 'string' || !valid_token(requested_profile))
+			return { error: 'invalid_proxy_profile', message: 'SOCKS5 proxy profile is invalid' };
+	}
+	else if (input.proxy != null) {
+		let proxy_dns = input.proxy_dns ?? cfg.proxy_dns ?? 'remote';
+		if (!valid_proxy(input.proxy) || (proxy_dns != 'local' && proxy_dns != 'remote'))
+			return { error: 'invalid_proxy', message: 'SOCKS5 proxy address or DNS mode is invalid' };
+
+		return { proxy: input.proxy || '', proxy_dns: proxy_dns, proxy_profile: null };
+	}
+	else {
+		requested_profile = cfg.proxy_profile || 'none';
+	}
+
+	if (requested_profile == 'none')
+		return { proxy: '', proxy_dns: 'remote', proxy_profile: 'none' };
+
+	let profile = find_proxy_profile(state.profiles, requested_profile);
+	if (profile == null)
+		return { error: 'unknown_proxy_profile', message: 'Selected SOCKS5 proxy profile does not exist or is invalid' };
+
+	return { proxy: profile.address, proxy_dns: profile.proxy_dns, proxy_profile: profile.id };
 }
 
 function country_from_value(value) {
@@ -470,16 +570,16 @@ function version_info() {
 	};
 }
 
-function normalized_options(input) {
+function normalized_options(input, ignore_proxy) {
 	input = input || {};
-	let cfg = current_config();
+	let config_state = load_config_state();
+	let cfg = config_state.config;
 	let group = valid_enum(input.group || cfg.group, [ 'all', 'primary', 'custom', 'cdn' ], 'all');
 	let ip_mode = valid_enum(input.ip_mode || cfg.ip_mode, [ 'auto', 'ipv4', 'ipv6', 'both' ], 'auto');
 	let geoip_mode = valid_enum(input.geoip_mode || cfg.geoip_mode, [ 'lookup', 'route' ], 'lookup');
-	let proxy_dns = valid_enum(input.proxy_dns || cfg.proxy_dns, [ 'local', 'remote' ], 'remote');
 	let timeout = int(input.timeout ?? cfg.timeout ?? 5);
 	let retries = int(input.retries ?? cfg.retries ?? 1);
-	let proxy = input.proxy ?? cfg.proxy ?? '';
+	let proxy = resolved_proxy(input, config_state, ignore_proxy);
 	let iface = input.interface ?? cfg.interface ?? '';
 	let disabled = cfg.disabled_service || [];
 
@@ -488,9 +588,6 @@ function normalized_options(input) {
 
 	if (retries != retries || retries < 0 || retries > 5)
 		retries = 1;
-
-	if (!valid_proxy(proxy))
-		proxy = '';
 
 	if (iface != '' && (!valid_token(iface) || fs.stat('/sys/class/net/' + iface) == null))
 		iface = '';
@@ -501,11 +598,24 @@ function normalized_options(input) {
 	if (type(disabled) != 'array')
 		disabled = [];
 
-	return { group: group, ip_mode: ip_mode, geoip_mode: geoip_mode, proxy_dns: proxy_dns, timeout: timeout, retries: retries, proxy: proxy, interface: iface, disabled_service: disabled };
+	return {
+		group: group,
+		ip_mode: ip_mode,
+		geoip_mode: geoip_mode,
+		proxy_dns: proxy.proxy_dns || 'remote',
+		proxy_profile: proxy.proxy_profile,
+		timeout: timeout,
+		retries: retries,
+		proxy: proxy.proxy || '',
+		interface: iface,
+		disabled_service: disabled,
+		error: proxy.error,
+		message: proxy.message
+	};
 }
 
 function normalized_ai_options(input) {
-	let options = normalized_options(input);
+	let options = normalized_options(input, false);
 	let category = valid_enum(input && input.category, [ 'all', 'ai', 'ai_china' ], 'all');
 	let providers = input && input.providers ? input.providers : [];
 
@@ -521,15 +631,18 @@ function normalized_ai_options(input) {
 		auth_check: false,
 		ip_mode: options.ip_mode,
 		proxy_dns: options.proxy_dns,
+		proxy_profile: options.proxy_profile,
 		timeout: options.timeout,
 		retries: options.retries,
 		proxy: options.proxy,
-		interface: options.interface
+		interface: options.interface,
+		error: options.error,
+		message: options.message
 	};
 }
 
 function normalized_dns_options(input) {
-	let options = normalized_options(input);
+	let options = normalized_options(input, true);
 	let transport = valid_enum(input && input.transport, [ 'all', 'plain', 'udp', 'tcp', 'both', 'doh', 'dot' ], 'all');
 	let transport_valid = !input || input.transport == null || valid_enum(input.transport, [ 'all', 'plain', 'udp', 'tcp', 'both', 'doh', 'dot' ], null) != null;
 	let raw_type = input && input.type != null ? input.type : 'A';
@@ -645,6 +758,8 @@ const methods = {
 
 			let input = req && req.args ? req.args.options : req && req.options ? req.options : {};
 			let options = normalized_options(input);
+			if (options.error)
+				return { running: false, error: options.error, message: options.message };
 			let args = [ '/usr/bin/ipregion', '--no-uci', '--group', options.group, '--ip-mode', options.ip_mode, '--geoip-mode', options.geoip_mode, '--timeout', '' + options.timeout, '--retries', '' + options.retries, '--output', RESULT_FILE ];
 
 			if (options.proxy != '')
@@ -675,6 +790,7 @@ const methods = {
 				group: options.group,
 				ip_mode: options.ip_mode,
 				geoip_mode: options.geoip_mode,
+				proxy_profile: options.proxy_profile,
 				current: 'Starting',
 				current_id: 'start',
 				result_file: RESULT_FILE,
@@ -715,6 +831,8 @@ const methods = {
 
 			let input = req && req.args ? req.args.options : req && req.options ? req.options : {};
 			let options = normalized_ai_options(input || {});
+			if (options.error)
+				return { running: false, error: options.error, message: options.message };
 			let args = [ '/usr/bin/ipregion', 'ai', '--no-uci', '--category', options.category, '--ip-mode', options.ip_mode, '--timeout', '' + options.timeout, '--retries', '' + options.retries, '--output', AI_RESULT_FILE ];
 
 			if (options.proxy != '')
@@ -744,6 +862,7 @@ const methods = {
 				started_at: time(),
 				mode: 'ai',
 				category: options.category,
+				proxy_profile: options.proxy_profile,
 				current: 'Starting',
 				current_id: 'start',
 				finished: 0,
@@ -774,7 +893,7 @@ const methods = {
 
 	ai_result: {
 		call: function(req) {
-			return read_json_file(AI_RESULT_FILE, { version: 1, mode: 'ai', egress: {}, providers: [], errors: [] });
+			return read_json_file(AI_RESULT_FILE, { version: 2, mode: 'ai', egress: {}, providers: [], errors: [] });
 		}
 	},
 

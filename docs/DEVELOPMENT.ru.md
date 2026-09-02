@@ -96,10 +96,12 @@ Router smoke checks должны покрывать:
 - `ipregion --self-test --json`
 - обычные GeoIP/popular/CDN runs через CLI и ubus
 - `ipregion ai --provider google_gemini --json`
+- `ipregion ai --provider google_gemini_web --json`
 - `ipregion dns --provider google --transport all --ip-mode ipv4 --json`
 - загрузку LuCI page после `rpcd` restart и `uhttpd` reload
 - GeoIP режимы `lookup` и `route`
 - SOCKS5 local DNS и remote DNS, если доступен proxy
+- fallback для прежней одиночной настройки proxy и переключение между несколькими proxy-профилями
 
 ## Runtime State
 
@@ -135,6 +137,7 @@ Endpoint failures должны оставаться per-service и не долж
 - Это diagnostics-only приложение, которое делает outbound UDP/53, TCP/53, HTTPS/443 и аутентифицированные DNS-over-TLS/853 requests.
 - `knot-dig` обеспечивает строгую проверку сертификата и hostname для DoT; он должен оставаться в package `DEPENDS`.
 - SOCKS5 checks должны поддерживать local DNS через `socks5://` и remote DNS через `socks5h://`.
+- Проверки Gemini Web и API независимы и требуют split-routing для `gemini.google.com` и `generativelanguage.googleapis.com` соответственно.
 - Debug/log output должен оставаться локально в `/tmp/run/ipregion/`.
 
 ## Release Packaging

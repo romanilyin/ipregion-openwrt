@@ -3,8 +3,8 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=ipregion
-PKG_VERSION:=2026.9.1
-PKG_RELEASE:=2
+PKG_VERSION:=2026.9.2
+PKG_RELEASE:=1
 PKG_LICENSE:=MIT
 PKG_MAINTAINER:=Roman Ilyin <https://github.com/romanilyin>
 

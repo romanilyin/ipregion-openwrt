@@ -5,7 +5,7 @@
 import * as fs from 'fs';
 import { cursor } from 'uci';
 
-const VERSION = '2026.9.1-2';
+const VERSION = '2026.9.2-1';
 const CATALOG_PATH = getenv('IPREGION_CATALOG_PATH') || '/usr/share/ipregion/services.json';
 const AI_CATALOG_PATH = getenv('IPREGION_AI_CATALOG_PATH') || '/usr/share/ipregion/services-ai.json';
 const DNS_CATALOG_PATH = getenv('IPREGION_DNS_CATALOG_PATH') || '/usr/share/ipregion/services-dns.json';
@@ -490,7 +490,8 @@ function apply_uci_config(opts) {
 	if (opts.no_uci || opts.config != DEFAULT_CONFIG)
 		return opts;
 
-	let uci = cursor();
+	let config_dir = getenv('IPREGION_UCI_CONFIG_DIR');
+	let uci = config_dir != null && config_dir != '' ? cursor(config_dir) : cursor();
 	if (uci == null || uci.load('ipregion') == null)
 		return opts;
 
@@ -505,8 +506,44 @@ function apply_uci_config(opts) {
 	if (!seen.geoip_mode && cfg.geoip_mode != null) opts.geoip_mode = cfg.geoip_mode;
 	if (!seen.timeout && cfg.timeout != null) opts.timeout = parse_int_range(cfg.timeout, 'timeout', 1, 60);
 	if (!seen.retries && cfg.retries != null) opts.retries = parse_int_range(cfg.retries, 'retries', 0, 5);
-	if (opts.mode != 'dns' && !seen.proxy && cfg.proxy != null && cfg.proxy != '') opts.proxy = cfg.proxy;
-	if (!seen.proxy_dns && cfg.proxy_dns != null) opts.proxy_dns = cfg.proxy_dns;
+	if (opts.mode != 'dns' && !seen.proxy) {
+		let profile_id = cfg.proxy_profile;
+		let profile = null;
+
+		if (profile_id == null || profile_id == '')
+			profile_id = cfg.proxy != null && cfg.proxy != '' ? 'legacy' : 'none';
+
+		if (!match(profile_id, /^[A-Za-z0-9_.:-]+$/))
+			die('invalid UCI proxy profile: ' + profile_id, 2);
+
+		if (profile_id == 'legacy') {
+			if (cfg.proxy == null || cfg.proxy == '')
+				die('legacy UCI proxy profile has no address', 2);
+
+			profile = { address: cfg.proxy, proxy_dns: cfg.proxy_dns || 'remote' };
+		}
+		else if (profile_id != 'none') {
+			uci.foreach('ipregion', 'proxy', function(section) {
+				if (section['.name'] == profile_id)
+					profile = section;
+			});
+
+			if (profile == null)
+				die('unknown UCI proxy profile: ' + profile_id, 2);
+		}
+
+		if (profile != null) {
+			if (profile.address == null || profile.address == '')
+				die('UCI proxy profile has no address: ' + profile_id, 2);
+
+			opts.proxy = profile.address;
+			if (!seen.proxy_dns)
+				opts.proxy_dns = profile.proxy_dns || 'remote';
+		}
+	}
+	else if (!seen.proxy_dns && cfg.proxy_dns != null) {
+		opts.proxy_dns = cfg.proxy_dns;
+	}
 	if (!seen.interface && cfg.interface != null && cfg.interface != '') opts.interface = validate_token(cfg.interface, 'interface');
 	if (!seen.debug && cfg.debug != null) opts.debug = cfg.debug == '1';
 	if (cfg.mask_ip != null) opts.mask_ip = cfg.mask_ip != '0';
@@ -1156,6 +1193,23 @@ function copy_headers(headers) {
 	return out;
 }
 
+function ai_failure_stage(response, opts) {
+	if (response.exit_code == 6)
+		return opts.proxy != null ? 'proxy host resolution' : 'DNS resolution';
+
+	if (response.timing == null || response.timing.connect_ms == null || response.timing.connect_ms <= 0) {
+		if (response.timing == null || response.timing.dns_ms == null || response.timing.dns_ms <= 0)
+			return opts.proxy != null ? 'proxy DNS or connection setup' : 'DNS or connection setup';
+
+		return opts.proxy != null ? 'SOCKS5 proxy connection' : 'TCP connection';
+	}
+
+	if (response.timing.tls_ms == null || response.timing.tls_ms <= 0)
+		return opts.proxy != null ? 'SOCKS5 negotiation or upstream TLS setup' : 'TLS handshake';
+
+	return 'HTTP response';
+}
+
 function curl_ai_probe(provider, opts, ip_version, url, headers) {
 	let method = provider.method || 'GET';
 	let args = [
@@ -1168,8 +1222,11 @@ function curl_ai_probe(provider, opts, ip_version, url, headers) {
 		'--max-time', '' + opts.timeout,
 		'--dump-header', '-',
 		'--output', '-',
-		'--write-out', '\n__IPREGION_HTTP_CODE:%{http_code}\n__IPREGION_REMOTE_IP:%{remote_ip}\n__IPREGION_TIME_CONNECT:%{time_connect}\n__IPREGION_TIME_APPCONNECT:%{time_appconnect}\n__IPREGION_TIME_TOTAL:%{time_total}'
+		'--write-out', '\n__IPREGION_HTTP_CODE:%{http_code}\n__IPREGION_REMOTE_IP:%{remote_ip}\n__IPREGION_TIME_NAMELOOKUP:%{time_namelookup}\n__IPREGION_TIME_CONNECT:%{time_connect}\n__IPREGION_TIME_APPCONNECT:%{time_appconnect}\n__IPREGION_TIME_TOTAL:%{time_total}'
 	];
+
+	if (provider.follow_redirects == true)
+		push(args, '--location', '--max-redirs', '5');
 
 	if (ip_version == 4)
 		push(args, '-4');
@@ -1226,7 +1283,7 @@ function curl_ai_probe(provider, opts, ip_version, url, headers) {
 	if (total_ms == null)
 		total_ms = fallback_ms;
 
-	return {
+	let result = {
 		body: split_payload.body,
 		headers: response_headers,
 		http_code: http_code,
@@ -1234,11 +1291,14 @@ function curl_ai_probe(provider, opts, ip_version, url, headers) {
 		latency_ms: total_ms,
 		exit_code: exit_code,
 		timing: {
+			dns_ms: seconds_marker_ms(output, 'TIME_NAMELOOKUP'),
 			connect_ms: seconds_marker_ms(output, 'TIME_CONNECT'),
 			tls_ms: seconds_marker_ms(output, 'TIME_APPCONNECT'),
 			total_ms: total_ms
 		}
 	};
+	result.failure_stage = ai_failure_stage(result, opts);
+	return result;
 }
 
 function ai_pattern_match(body, patterns) {
@@ -1265,7 +1325,14 @@ function ai_network_status(exit_code) {
 	return 'network_failed';
 }
 
-function ai_diagnosis(status, auth_check) {
+function ai_endpoint_host(provider) {
+	let m = match(provider && provider.url || '', /^https?:\/\/([^\/]+)/);
+	return m ? m[1] : 'provider endpoint';
+}
+
+function ai_diagnosis(status, auth_check, provider, response) {
+	let host = ai_endpoint_host(provider);
+
 	switch (status) {
 	case 'ok':
 		return auth_check ? 'Authenticated provider check succeeded.' : 'Endpoint reached successfully.';
@@ -1288,7 +1355,7 @@ function ai_diagnosis(status, auth_check) {
 	case 'tls_failed':
 		return 'TLS handshake or certificate validation failed through this route.';
 	case 'timeout':
-		return 'DNS, TCP, TLS or HTTP request did not complete before timeout.';
+		return 'Request to ' + host + ' timed out during ' + (response && response.failure_stage || 'network access') + '. Check the selected route, proxy and split-routing coverage for this hostname.';
 	case 'server_error':
 		return 'Endpoint reached, but provider returned a server error.';
 	case 'skipped':
@@ -1303,26 +1370,35 @@ function ai_diagnosis(status, auth_check) {
 function classify_ai_provider(provider, response, auth_check) {
 	let code = response.http_code;
 
-	if (response.exit_code != 0 && code == 0)
+	if (response.exit_code != 0)
 		return ai_network_status(response.exit_code);
-
-	if (contains_number(provider.success_status || [ 200 ], code))
-		return 'ok';
-
-	if (code == 401)
-		return auth_check ? 'auth_failed' : 'reachable_auth_required';
-
-	if (code == 403)
-		return ai_pattern_match(response.body, provider.region_error_patterns) ? 'blocked_by_provider_region' : 'forbidden';
 
 	if (code == 429)
 		return 'rate_limited';
 
-	if ((code == 404 || code == 405) && contains_number(provider.reachable_status || [], code))
-		return 'endpoint_reached_wrong_method';
-
 	if (code >= 500 && code <= 599)
 		return 'server_error';
+
+	if (provider.kind == 'web' && ai_pattern_match(response.body, provider.region_error_patterns))
+		return 'blocked_by_provider_region';
+
+	if (contains_number(provider.success_status || [ 200 ], code))
+		return 'ok';
+
+	if ((code == 400 || code == 403) && ai_pattern_match(response.body, provider.region_error_patterns))
+		return 'blocked_by_provider_region';
+
+	if (code == 401 && provider.kind == 'web')
+		return 'reachable';
+
+	if (code == 401 || ((code == 400 || code == 403) && ai_pattern_match(response.body, provider.auth_error_patterns)))
+		return auth_check ? 'auth_failed' : 'reachable_auth_required';
+
+	if (code == 403)
+		return 'forbidden';
+
+	if ((code == 404 || code == 405) && contains_number(provider.reachable_status || [], code))
+		return 'endpoint_reached_wrong_method';
 
 	if (contains_number(provider.reachable_status || [], code))
 		return 'reachable';
@@ -1347,6 +1423,7 @@ function skipped_ai_provider(provider, reason, ip_version, status) {
 		category: provider.category || 'ai',
 		category_label: ai_category_label(provider.category || 'ai'),
 		kind: provider.kind || 'api',
+		endpoint_role: provider.endpoint_role || provider.kind || 'api',
 		url: provider.url,
 		status: status,
 		label: AI_STATUS_LABELS[status] || status,
@@ -1354,8 +1431,10 @@ function skipped_ai_provider(provider, reason, ip_version, status) {
 		remote_ip: null,
 		request_id: null,
 		latency_ms: null,
-		timing: { connect_ms: null, tls_ms: null, total_ms: null },
-		diagnosis: reason || ai_diagnosis(status, false)
+		curl_exit_code: null,
+		failure_stage: null,
+		timing: { dns_ms: null, connect_ms: null, tls_ms: null, total_ms: null },
+		diagnosis: reason || ai_diagnosis(status, false, provider, null)
 	};
 }
 
@@ -1396,6 +1475,7 @@ function probe_ai_provider(provider, opts, ip_version) {
 		category: provider.category || 'ai',
 		category_label: ai_category_label(provider.category || 'ai'),
 		kind: provider.kind || 'api',
+		endpoint_role: provider.endpoint_role || provider.kind || 'api',
 		url: provider.url,
 		status: status,
 		label: AI_STATUS_LABELS[status] || status,
@@ -1403,8 +1483,10 @@ function probe_ai_provider(provider, opts, ip_version) {
 		remote_ip: response.remote_ip || null,
 		request_id: request_id,
 		latency_ms: response.latency_ms,
+		curl_exit_code: response.exit_code,
+		failure_stage: response.exit_code != 0 ? response.failure_stage : null,
 		timing: response.timing,
-		diagnosis: ai_diagnosis(status, opts.auth_check)
+		diagnosis: ai_diagnosis(status, opts.auth_check, provider, response)
 	};
 }
 
@@ -1572,30 +1654,24 @@ function disney_plus_country(catalog, opts, ip_version) {
 	return extract_value({ extract: { type: 'json', path: ['extensions', 'sdk', 'session', 'location', 'countryCode'] } }, response);
 }
 
-function gemini_supported(opts, ip_version) {
-	let country = google_country(opts, ip_version);
-	if (country.status != 'ok')
-		return country;
+function gemini_web(opts, ip_version) {
+	let response = curl_request('GET', 'https://gemini.google.com/app', opts, ip_version, { headers: { 'Accept-Language': 'en-US,en;q=0.9' }, user_agent: USER_AGENT });
+	let blocked = match(response.body || '', /not available in your country|not currently available in your country|unsupported country|unsupported region/i) != null;
 
-	let name_response = curl_request('GET', 'https://restcountries.com/v3.1/alpha/' + country.value + '?fields=name', opts, 4, { headers: {}, user_agent: USER_AGENT });
-	let parsed = parse_json_safe(name_response.body || '');
-	let country_name = parsed ? get_path(parsed, ['name', 'common']) : null;
-	if (country_name == null || country_name == '')
-		return result_status('na', null, name_response.latency_ms, name_response.http_code, null);
+	if (response.exit_code != 0)
+		return result_status('error', null, response.latency_ms, response.http_code, 'curl exit ' + response.exit_code);
 
-	let regions = curl_request('GET', 'https://ai.google.dev/gemini-api/docs/available-regions.md.txt', opts, ip_version, { headers: {}, user_agent: USER_AGENT });
-	let err = result_from_response_error(regions);
+	if (blocked)
+		return result_status('denied', 'Region blocked', response.latency_ms, response.http_code, null);
+
+	let err = result_from_response_error(response);
 	if (err != null)
 		return err;
 
-	let available = false;
-	for (let line in split(regions.body || '', '\n')) {
-		if (trim_str(line) == '- ' + country_name) {
-			available = true;
-			break;
-		}
-	}
-	return result_status('ok', available ? 'Yes' : 'No', regions.latency_ms, regions.http_code, null);
+	if (response.http_code >= 200 && response.http_code < 400)
+		return result_status('ok', 'Reachable', response.latency_ms, response.http_code, null);
+
+	return result_status('na', null, response.latency_ms, response.http_code, null);
 }
 
 function reddit_guest_access(opts, ip_version) {
@@ -1727,7 +1803,7 @@ function handler_result(id, service, catalog, opts, ip_version) {
 	case 'DISNEY_PLUS':
 		return disney_plus_country(catalog, opts, ip_version);
 	case 'GEMINI_SUPPORTED':
-		return gemini_supported(opts, ip_version);
+		return gemini_web(opts, ip_version);
 	case 'REDDIT_GUEST_ACCESS':
 		return reddit_guest_access(opts, ip_version);
 	case 'YOUTUBE_PREMIUM':
@@ -2619,7 +2695,7 @@ function build_dns_result(opts, catalog) {
 function build_ai_result(opts, catalog) {
 	let start = clock(true);
 	let result = {
-		version: 1,
+		version: 2,
 		mode: 'ai',
 		generated_at: now_iso(),
 		duration_ms: 0,
