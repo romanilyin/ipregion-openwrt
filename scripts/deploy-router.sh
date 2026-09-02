@@ -68,13 +68,16 @@ scp_to "$ROOT_DIR/ipregion/files/usr/share/ipregion/jsonpath.uc" "/usr/share/ipr
 scp_to "$ROOT_DIR/ipregion/files/usr/share/ipregion/services.json" "/usr/share/ipregion/services.json"
 scp_to "$ROOT_DIR/ipregion/files/usr/share/ipregion/services-ai.json" "/usr/share/ipregion/services-ai.json"
 scp_to "$ROOT_DIR/ipregion/files/usr/share/ipregion/services-dns.json" "/usr/share/ipregion/services-dns.json"
-scp_to "$ROOT_DIR/ipregion/files/etc/config/ipregion" "/etc/config/ipregion"
+if ! ssh_run "test -f /etc/config/ipregion"; then
+	scp_to "$ROOT_DIR/ipregion/files/etc/config/ipregion" "/etc/config/ipregion"
+fi
 scp_to "$ROOT_DIR/luci-app-ipregion/root/usr/share/rpcd/acl.d/luci-app-ipregion.json" "/usr/share/rpcd/acl.d/luci-app-ipregion.json"
 scp_to "$ROOT_DIR/luci-app-ipregion/root/usr/share/rpcd/ucode/ipregion.uc" "/usr/share/rpcd/ucode/ipregion.uc"
 scp_to "$ROOT_DIR/luci-app-ipregion/root/usr/share/luci/menu.d/luci-app-ipregion.json" "/usr/share/luci/menu.d/luci-app-ipregion.json"
 scp_to "$ROOT_DIR/luci-app-ipregion/htdocs/luci-static/resources/view/ipregion/status.js" "/www/luci-static/resources/view/ipregion/status.js"
 scp_to "$ROOT_DIR/luci-app-ipregion/htdocs/luci-static/resources/view/ipregion/settings.js" "/www/luci-static/resources/view/ipregion/settings.js"
 scp_to "$ROOT_DIR/luci-app-ipregion/htdocs/luci-static/resources/ipregion/ipregion.css" "/www/luci-static/resources/ipregion/ipregion.css"
+scp_to "$ROOT_DIR/luci-app-ipregion/htdocs/luci-static/resources/ipregion/markdown.js" "/www/luci-static/resources/ipregion/markdown.js"
 
 if [ -f "$ROOT_DIR/luci-app-ipregion/htdocs/luci-static/resources/ipregion/logo.png" ]; then
 	scp_to "$ROOT_DIR/luci-app-ipregion/htdocs/luci-static/resources/ipregion/logo.png" "/www/luci-static/resources/ipregion/logo.png"

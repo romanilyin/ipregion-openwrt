@@ -61,8 +61,8 @@ msgstr "Проверять обнаруженный IP"
 msgid "Check service-visible route"
 msgstr "Проверять маршрут глазами сервиса"
 
-msgid "Check whether popular AI API endpoints are reachable through the selected route."
-msgstr "Проверяет, доступны ли популярные AI API endpoint-ы через выбранный маршрут."
+msgid "Check whether popular AI web and API endpoints are reachable through the selected route."
+msgstr "Проверяет, доступны ли популярные web- и API-endpoint-ы AI через выбранный маршрут."
 
 msgid "China and Asia AI providers"
 msgstr "AI-провайдеры Китая и Азии"
@@ -340,8 +340,8 @@ msgstr "AI-проверки используют выбранные выше р�
 msgid "Clear results"
 msgstr "Очистить результаты"
 
-msgid "Download JSON includes raw IP addresses."
-msgstr "Скачанный JSON содержит исходные IP-адреса."
+msgid "Download JSON includes raw IP addresses. Copied Markdown omits raw IP addresses, proxy endpoints and route identifiers."
+msgstr "Скачанный JSON содержит исходные IP-адреса. Скопированный Markdown не содержит исходные IP-адреса, endpoint-ы прокси и идентификаторы маршрута."
 
 msgid "Installed and GitHub versions differ"
 msgstr "Установленная версия отличается от версии на GitHub"
@@ -364,17 +364,8 @@ msgstr "Открыть настройки"
 msgid "Remote DNS uses socks5h:// and resolves names through the proxy. Local DNS uses socks5:// and resolves names on the router."
 msgstr "Удаленный DNS использует socks5h:// и резолвит имена через прокси. Локальный DNS использует socks5:// и резолвит имена на роутере."
 
-msgid "SOCKS5 proxy must be host:port, for example 127.0.0.1:1080"
-msgstr "SOCKS5 proxy должен быть в формате host:port, например 127.0.0.1:1080"
-
-msgid "Saved proxy shown on Status page. Enter host:port without socks5:// prefix, for example 127.0.0.1:1080."
-msgstr "Сохраненный proxy показывается на странице Status. Введите host:port без префикса socks5://, например 127.0.0.1:1080."
-
-msgid "Set the saved SOCKS5 proxy in Settings, then select it here for checks."
-msgstr "Задайте сохраненный SOCKS5 proxy в настройках, затем выберите его здесь для проверок."
-
-msgid "Use saved SOCKS5 proxy"
-msgstr "Использовать сохраненный SOCKS5 proxy"
+msgid "SOCKS5 proxy must be host:port with a port from 1 to 65535"
+msgstr "SOCKS5 proxy должен быть в формате host:port с портом от 1 до 65535"
 
 msgid "Answer"
 msgstr "Ответ"
@@ -606,3 +597,108 @@ msgstr "Совпадающие ответы означают только отс
 
 msgid "Compare UDP/53, TCP/53, DoH and DoT responses from public and active-interface DNS resolvers in one check."
 msgstr "Сравнивает ответы UDP/53, TCP/53, DoH и DoT от публичных DNS и DNS активного интерфейса в одной проверке."
+
+msgid "AI provider check failed to start"
+msgstr "Не удалось запустить проверку AI-провайдеров"
+
+msgid "Automatic clipboard access failed. Copy the Markdown text manually."
+msgstr "Автоматический доступ к буферу обмена не сработал. Скопируйте текст Markdown вручную."
+
+msgid "Copy Markdown"
+msgstr "Копировать Markdown"
+
+msgid "Default SOCKS5 proxy profile"
+msgstr "Профиль SOCKS5 proxy по умолчанию"
+
+msgid "Define SOCKS5 proxy profiles in Settings, then select one here for GeoIP, service and AI checks."
+msgstr "Создайте профили SOCKS5 proxy в настройках, затем выберите один здесь для проверок GeoIP, сервисов и AI."
+
+msgid "Define multiple SOCKS5 endpoints, for example Podkop mixed proxies, and select any profile on the Status page."
+msgstr "Задайте несколько SOCKS5 endpoint-ов, например mixed proxy Podkop, и выбирайте нужный профиль на странице Status."
+
+msgid "IP Region check failed to start"
+msgstr "Не удалось запустить проверку IP Region"
+
+msgid "Legacy SOCKS5 proxy"
+msgstr "Прежний SOCKS5 proxy"
+
+msgid "Markdown copied to clipboard."
+msgstr "Markdown скопирован в буфер обмена."
+
+msgid "Profile name"
+msgstr "Имя профиля"
+
+msgid "Profile name is required"
+msgstr "Имя профиля обязательно"
+
+msgid "Run a check before copying Markdown."
+msgstr "Перед копированием Markdown запустите проверку."
+
+msgid "SOCKS5 proxy address or DNS mode is invalid"
+msgstr "Некорректный адрес SOCKS5 proxy или режим DNS"
+
+msgid "SOCKS5 proxy profile is invalid"
+msgstr "Некорректный профиль SOCKS5 proxy"
+
+msgid "SOCKS5 proxy profiles"
+msgstr "Профили SOCKS5 proxy"
+
+msgid "Selected SOCKS5 proxy profile does not exist or is invalid"
+msgstr "Выбранный профиль SOCKS5 proxy не существует или некорректен"
+
+msgid "Used by default for GeoIP, service and AI checks. New profiles appear here after the settings are saved and reloaded."
+msgstr "Используется по умолчанию для проверок GeoIP, сервисов и AI. Новые профили появятся здесь после сохранения и перезагрузки настроек."
+
+msgid "VPN Europe"
+msgstr "VPN Европа"
+
+msgid "A configuration section with this ID already exists"
+msgstr "Раздел конфигурации с таким ID уже существует"
+
+msgid "Answers"
+msgstr "Ответы"
+
+msgid "Duration"
+msgstr "Длительность"
+
+msgid "Generated"
+msgstr "Создано"
+
+msgid "IP omitted"
+msgstr "IP скрыт"
+
+msgid "IPRegion AI result"
+msgstr "Результат IPRegion AI"
+
+msgid "IPRegion DNS result"
+msgstr "Результат IPRegion DNS"
+
+msgid "IPRegion result"
+msgstr "Результат IPRegion"
+
+msgid "Interception"
+msgstr "Перехват"
+
+msgid "Profile ID is required"
+msgstr "ID профиля обязателен"
+
+msgid "Profile IDs none and legacy are reserved"
+msgstr "ID профиля none и legacy зарезервированы"
+
+msgid "Query names, answer values, endpoint addresses and route identifiers are omitted."
+msgstr "Имена запросов, значения ответов, адреса endpoint-ов и идентификаторы маршрута скрыты."
+
+msgid "Raw IP addresses, proxy endpoints and route identifiers are omitted."
+msgstr "Исходные IP-адреса, endpoint-ы прокси и идентификаторы маршрута скрыты."
+
+msgid "Rcode"
+msgstr "Rcode"
+
+msgid "Role"
+msgstr "Роль"
+
+msgid "endpoint omitted"
+msgstr "endpoint скрыт"
+
+msgid "route detail omitted"
+msgstr "данные маршрута скрыты"

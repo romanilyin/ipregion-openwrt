@@ -33,16 +33,49 @@
     "request_id_headers": ["request-id"]
   },
   {
+    "id": "google_gemini_web",
+    "name": "Google Gemini Web",
+    "category": "ai",
+    "kind": "web",
+    "endpoint_role": "web",
+    "url": "https://gemini.google.com/app",
+    "method": "GET",
+    "headers": {},
+    "follow_redirects": true,
+    "success_status": [200],
+    "reachable_status": [302, 303, 307, 308, 401, 403, 429],
+    "region_error_patterns": [
+      "not available in your country",
+      "not currently available in your country",
+      "unsupported country",
+      "unsupported region"
+    ],
+    "required_domains": ["gemini.google.com"]
+  },
+  {
     "id": "google_gemini",
     "name": "Google Gemini API",
     "category": "ai",
     "kind": "api",
+    "endpoint_role": "api",
     "url": "https://generativelanguage.googleapis.com/v1beta/models",
     "method": "GET",
     "auth": { "type": "query", "name": "key", "env": "GEMINI_API_KEY", "optional": true },
     "headers": {},
     "success_status": [200],
-    "reachable_status": [400, 401, 403, 404, 429]
+    "reachable_status": [400, 401, 403, 404, 429],
+    "auth_error_patterns": [
+      "API_KEY_INVALID",
+      "API key not valid",
+      "unregistered callers"
+    ],
+    "region_error_patterns": [
+      "user location is not supported",
+      "location is not supported",
+      "unsupported country",
+      "unsupported region"
+    ],
+    "required_domains": ["generativelanguage.googleapis.com"]
   },
   {
     "id": "deepseek",

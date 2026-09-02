@@ -35,7 +35,7 @@ IPRegion runs diagnostics from the router itself and compares independent servic
 - GeoIP checks show what country public geolocation APIs assign to the route.
 - Popular service checks show region, access, rate-limit or denial signals from major platforms.
 - CDN checks show which CDN edge or region the router reaches.
-- AI checks probe real AI API endpoint domains in safe unauthenticated mode.
+- AI checks probe real AI web and API endpoint domains in safe unauthenticated mode.
 - DNS security checks compare UDP/53, TCP/53, DoH and DoT responses from Google, Cloudflare, Quad9, AdGuard DNS and Yandex DNS; plain DNS learned from the active interface is included when available.
 - Checks can use the default route, a selected OpenWrt interface or a SOCKS5 proxy.
 
@@ -75,7 +75,7 @@ The installer downloads `ipregion*.apk`, `luci-app-ipregion*.apk` and `luci-i18n
 
 APK installer options:
 
-- `IPREGION_RELEASE=2026.9.1-2`: install a specific GitHub release tag instead of `latest`.
+- `IPREGION_RELEASE=2026.9.2-1`: install a specific GitHub release tag instead of `latest`.
 - `IPREGION_INSTALL_LUCI=0`: install only the CLI/backend package.
 - `IPREGION_APK_UPDATE=0`: skip `apk update` before installation.
 - `IPREGION_DOWNLOAD_RETRIES=5`: retry GitHub metadata and APK downloads more times.
@@ -83,7 +83,7 @@ APK installer options:
 Pinned release example:
 
 ```sh
-wget -qO- https://raw.githubusercontent.com/romanilyin/ipregion-openwrt/main/install.sh | IPREGION_RELEASE=2026.9.1-2 sh
+wget -qO- https://raw.githubusercontent.com/romanilyin/ipregion-openwrt/main/install.sh | IPREGION_RELEASE=2026.9.2-1 sh
 ```
 
 Manual install from downloaded APK files:
@@ -114,11 +114,11 @@ Open `Status -> IP Region` in LuCI.
 
 - Run GeoIP, popular service, CDN, unified DNS integrity and AI endpoint checks from one page.
 - Choose IP mode, interface, SOCKS5 proxy, timeout and GeoIP mode.
-- Configure the saved SOCKS5 proxy in `Services -> IP Region`, then select it on the Status page.
+- Configure multiple SOCKS5 proxy profiles in `Services -> IP Region`, including per-profile local or remote DNS, then select any profile on the Status page.
 - Set a reference country to highlight matching country values in orange and different country values in blue.
 - AI checks show separate IPv4 and IPv6 provider rows when `IPv4 and IPv6` mode is selected; unavailable transports are shown explicitly.
 - View progress while checks run.
-- Download JSON results. JSON downloads include raw IP addresses.
+- Download raw JSON results or copy privacy-safe Markdown tables. Markdown omits raw IP addresses, proxy endpoints and route identifiers.
 - Update the package from GitHub Releases through the version card; downgrade protection prevents installing an older latest release.
 - Open `Services -> IP Region` for default UCI settings.
 
@@ -136,6 +136,7 @@ ipregion --interface wan --group primary --json
 ipregion --proxy 127.0.0.1:1080 --proxy-dns remote --group custom --json
 ipregion ai --json
 ipregion ai --provider google_gemini --json
+ipregion ai --provider google_gemini_web --json
 ipregion dns --json
 ipregion dns --provider google --transport all --ip-mode ipv4 --json
 ipregion dns --provider interface_dns --transport plain --ip-mode ipv4 --json
@@ -149,7 +150,7 @@ ipregion dns --provider interface_dns --transport plain --ip-mode ipv4 --json
 - `--group cdn`: CDN services.
 - `--geoip-mode lookup`: discover the router egress IP first, then ask GeoIP APIs to look up that IP.
 - `--geoip-mode route`: ask supported GeoIP APIs what country they see for the request itself.
-- `ipregion ai --json`: run safe AI provider endpoint probes without storing or requesting API keys.
+- `ipregion ai --json`: run safe AI web/API endpoint probes without storing or requesting API keys.
 - `ipregion ai --ip-mode both --json`: run each selected AI provider through separate IPv4 and IPv6 probes.
 - `ipregion dns --json`: run UDP/53, TCP/53, DoH and DoT in one check and compare response codes and answers.
 - `ipregion dns --dns-name example.com --dns-type A --json`: run all DNS transports for a validated query name and record type.
@@ -163,6 +164,7 @@ For SOCKS5 proxy checks:
 ## Notes
 
 - `401`, `403`, `404`, `405` and `429` in AI mode can still mean that the provider endpoint was reached; DNS, TLS, timeout and network failures are classified separately.
+- Google Gemini Web uses `gemini.google.com`; the separate Gemini API probe uses `generativelanguage.googleapis.com`. Domain-based split routing must cover each hostname that should use the VPN.
 - Public DNS checks connect to published resolver IP addresses; DoH and DoT additionally verify provider TLS hostnames. Interface DNS addresses are read from the selected or active default OpenWrt interface and are tested over UDP/TCP only.
 - DNS mode ignores a proxy saved in UCI and rejects an explicit `--proxy`; DoH binds to a selected interface, while UDP, TCP and DoT bind to that interface's source address.
 - DNS `auto` mode prefers an available IPv4 default route and falls back to IPv6 on IPv6-only routers; use `--ip-mode both` to test both explicitly.

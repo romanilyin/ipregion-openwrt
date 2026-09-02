@@ -60,7 +60,7 @@ msgstr ""
 msgid "Check service-visible route"
 msgstr ""
 
-msgid "Check whether popular AI API endpoints are reachable through the selected route."
+msgid "Check whether popular AI web and API endpoints are reachable through the selected route."
 msgstr ""
 
 msgid "China and Asia AI providers"
@@ -339,7 +339,7 @@ msgstr ""
 msgid "Clear results"
 msgstr ""
 
-msgid "Download JSON includes raw IP addresses."
+msgid "Download JSON includes raw IP addresses. Copied Markdown omits raw IP addresses, proxy endpoints and route identifiers."
 msgstr ""
 
 msgid "Installed and GitHub versions differ"
@@ -363,16 +363,7 @@ msgstr ""
 msgid "Remote DNS uses socks5h:// and resolves names through the proxy. Local DNS uses socks5:// and resolves names on the router."
 msgstr ""
 
-msgid "SOCKS5 proxy must be host:port, for example 127.0.0.1:1080"
-msgstr ""
-
-msgid "Saved proxy shown on Status page. Enter host:port without socks5:// prefix, for example 127.0.0.1:1080."
-msgstr ""
-
-msgid "Set the saved SOCKS5 proxy in Settings, then select it here for checks."
-msgstr ""
-
-msgid "Use saved SOCKS5 proxy"
+msgid "SOCKS5 proxy must be host:port with a port from 1 to 65535"
 msgstr ""
 
 msgid "Answer"
@@ -604,4 +595,109 @@ msgid "Matching responses mean no mismatch was detected; they do not prove that 
 msgstr ""
 
 msgid "Compare UDP/53, TCP/53, DoH and DoT responses from public and active-interface DNS resolvers in one check."
+msgstr ""
+
+msgid "AI provider check failed to start"
+msgstr ""
+
+msgid "Automatic clipboard access failed. Copy the Markdown text manually."
+msgstr ""
+
+msgid "Copy Markdown"
+msgstr ""
+
+msgid "Default SOCKS5 proxy profile"
+msgstr ""
+
+msgid "Define SOCKS5 proxy profiles in Settings, then select one here for GeoIP, service and AI checks."
+msgstr ""
+
+msgid "Define multiple SOCKS5 endpoints, for example Podkop mixed proxies, and select any profile on the Status page."
+msgstr ""
+
+msgid "IP Region check failed to start"
+msgstr ""
+
+msgid "Legacy SOCKS5 proxy"
+msgstr ""
+
+msgid "Markdown copied to clipboard."
+msgstr ""
+
+msgid "Profile name"
+msgstr ""
+
+msgid "Profile name is required"
+msgstr ""
+
+msgid "Run a check before copying Markdown."
+msgstr ""
+
+msgid "SOCKS5 proxy address or DNS mode is invalid"
+msgstr ""
+
+msgid "SOCKS5 proxy profile is invalid"
+msgstr ""
+
+msgid "SOCKS5 proxy profiles"
+msgstr ""
+
+msgid "Selected SOCKS5 proxy profile does not exist or is invalid"
+msgstr ""
+
+msgid "Used by default for GeoIP, service and AI checks. New profiles appear here after the settings are saved and reloaded."
+msgstr ""
+
+msgid "VPN Europe"
+msgstr ""
+
+msgid "A configuration section with this ID already exists"
+msgstr ""
+
+msgid "Answers"
+msgstr ""
+
+msgid "Duration"
+msgstr ""
+
+msgid "Generated"
+msgstr ""
+
+msgid "IP omitted"
+msgstr ""
+
+msgid "IPRegion AI result"
+msgstr ""
+
+msgid "IPRegion DNS result"
+msgstr ""
+
+msgid "IPRegion result"
+msgstr ""
+
+msgid "Interception"
+msgstr ""
+
+msgid "Profile ID is required"
+msgstr ""
+
+msgid "Profile IDs none and legacy are reserved"
+msgstr ""
+
+msgid "Query names, answer values, endpoint addresses and route identifiers are omitted."
+msgstr ""
+
+msgid "Raw IP addresses, proxy endpoints and route identifiers are omitted."
+msgstr ""
+
+msgid "Rcode"
+msgstr ""
+
+msgid "Role"
+msgstr ""
+
+msgid "endpoint omitted"
+msgstr ""
+
+msgid "route detail omitted"
 msgstr ""

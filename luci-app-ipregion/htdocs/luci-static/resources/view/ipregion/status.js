@@ -2,6 +2,7 @@
 'require view';
 'require rpc';
 'require ui';
+'require ipregion.markdown as markdown';
 
 var regionPollTimer = null;
 var aiPollTimer = null;
@@ -10,6 +11,9 @@ var currentGeneratedAt = null;
 var aiGeneratedAt = null;
 var dnsGeneratedAt = null;
 var referenceCountry = '';
+var latestResult = null;
+var latestAiResult = null;
+var latestDnsResult = null;
 
 var callGetConfig = rpc.declare({ object: 'luci.ipregion', method: 'get_config', expect: { '': {} } });
 var callInterfaces = rpc.declare({ object: 'luci.ipregion', method: 'list_interfaces', expect: { '': {} } });
@@ -203,6 +207,15 @@ function dnsStartError(result) {
 	case 'invalid_dns_provider': return _('DNS provider is invalid');
 	case 'invalid_interface': return _('Network interface is invalid');
 	case 'dns_stop_failed': return _('DNS worker did not stop');
+	default: return result && (result.message || result.error) || _('Unknown error');
+	}
+}
+
+function routeStartError(result) {
+	switch (result && result.error) {
+	case 'invalid_proxy_profile': return _('SOCKS5 proxy profile is invalid');
+	case 'unknown_proxy_profile': return _('Selected SOCKS5 proxy profile does not exist or is invalid');
+	case 'invalid_proxy': return _('SOCKS5 proxy address or DNS mode is invalid');
 	default: return result && (result.message || result.error) || _('Unknown error');
 	}
 }
@@ -428,6 +441,7 @@ function clearDnsRows() {
 
 function resetResultUi() {
 	currentGeneratedAt = null;
+	latestResult = null;
 	[ 'primary', 'custom', 'cdn' ].forEach(clearGroupRows);
 	setContent('ipregion-network-ipv4', [ _('IPv4'), ': ', _('N/A') ]);
 	setContent('ipregion-network-ipv6', [ _('IPv6'), ': ', _('N/A') ]);
@@ -438,6 +452,7 @@ function resetResultUi() {
 
 function resetAiUi() {
 	aiGeneratedAt = null;
+	latestAiResult = null;
 	clearAiRows();
 	setContent('ipregion-ai-egress-ipv4', [ _('IPv4'), ': ', _('N/A') ]);
 	setContent('ipregion-ai-egress-ipv6', [ _('IPv6'), ': ', _('N/A') ]);
@@ -448,6 +463,7 @@ function resetAiUi() {
 
 function resetDnsUi() {
 	dnsGeneratedAt = null;
+	latestDnsResult = null;
 	clearDnsRows();
 	setContent('ipregion-dns-summary', '');
 	setContent('ipregion-dns-interception', '');
@@ -543,11 +559,21 @@ function updateDnsRows(rows) {
 
 function renderOptions(config, interfaces) {
 	interfaces = interfaces && interfaces.interfaces || [];
+	var profiles = config.proxy_profiles || [];
 	var group = config.group || 'all';
 	var ipMode = config.ip_mode || 'auto';
 	var geoipMode = config.geoip_mode || 'lookup';
 	var iface = config.interface || '';
-	var proxy = config.proxy || '';
+	var proxyProfile = config.proxy_profile || (config.proxy ? 'legacy' : 'none');
+	var proxyOptions = [ E('option', { 'value': 'none', 'selected': proxyProfile === 'none' ? 'selected' : null }, [ _('No proxy') ]) ];
+	var selectedProfileFound = proxyProfile === 'none';
+	profiles.forEach(function(profile) {
+		if (profile.id === proxyProfile)
+			selectedProfileFound = true;
+		proxyOptions.push(E('option', { 'value': profile.id, 'selected': profile.id === proxyProfile ? 'selected' : null }, [ profile.label || profile.id ]));
+	});
+	if (!selectedProfileFound)
+		proxyOptions.push(E('option', { 'value': proxyProfile, 'selected': 'selected' }, [ _('Selected SOCKS5 proxy profile does not exist or is invalid') + ' (' + proxyProfile + ')' ]));
 
 	return E('div', { 'class': 'ipregion-card ipregion-options' }, [
 		E('label', {}, [ _('Group'), E('select', { 'id': 'ipregion-group', 'change': function(ev) { updateGroupDescription(ev.target.value); } }, [
@@ -569,11 +595,9 @@ function renderOptions(config, interfaces) {
 		E('label', {}, [ _('Interface'), E('select', { 'id': 'ipregion-interface' }, interfaces.map(function(item) {
 			return E('option', { 'value': item.name || '', 'selected': (item.name || '') === iface ? 'selected' : null }, [ item.label || item.name || _('Default route') ]);
 		})) ]),
-		E('label', {}, [ _('Proxy'), E('select', { 'id': 'ipregion-proxy' }, [
-			E('option', { 'value': '', 'selected': !proxy ? 'selected' : null }, [ _('No proxy') ])
-		].concat(proxy ? [ E('option', { 'value': proxy, 'selected': 'selected' }, [ _('Use saved SOCKS5 proxy') + ' (' + proxy + ')' ]) ] : [])) ]),
+		E('label', {}, [ _('Proxy'), E('select', { 'id': 'ipregion-proxy' }, proxyOptions) ]),
 		E('label', {}, [ _('Timeout'), E('input', { 'id': 'ipregion-timeout', 'type': 'number', 'min': '1', 'max': '60', 'value': config.timeout || '5' }) ]),
-		E('p', { 'class': 'ipregion-muted ipregion-group-help' }, [ _('Set the saved SOCKS5 proxy in Settings, then select it here for checks.') ]),
+		E('p', { 'class': 'ipregion-muted ipregion-group-help' }, [ _('Define SOCKS5 proxy profiles in Settings, then select one here for GeoIP, service and AI checks.') ]),
 		E('a', { 'class': 'btn cbi-button', 'href': L.url('admin/services/ipregion') }, [ _('Open settings') ]),
 		E('p', { 'id': 'ipregion-group-description', 'class': 'ipregion-muted ipregion-group-help' }, [ groupDescription(group) ]),
 		E('p', { 'class': 'ipregion-muted ipregion-group-help' }, [ _('GeoIP lookup checks the discovered router IP. Service-visible route asks supported GeoIP APIs what country they see for this exact request path.') ])
@@ -719,6 +743,59 @@ function downloadJson(data, filename) {
 	URL.revokeObjectURL(url);
 }
 
+function fallbackCopy(text) {
+	var input = document.createElement('textarea');
+	input.value = text;
+	input.setAttribute('readonly', 'readonly');
+	input.style.position = 'fixed';
+	input.style.left = '-9999px';
+	document.body.appendChild(input);
+	input.select();
+
+	var copied = false;
+	try {
+		copied = document.execCommand('copy');
+	}
+	catch (e) {
+		copied = false;
+	}
+
+	document.body.removeChild(input);
+	return copied;
+}
+
+function manualCopy(text) {
+	ui.showModal(_('Copy Markdown'), [
+		E('p', {}, [ _('Automatic clipboard access failed. Copy the Markdown text manually.') ]),
+		E('textarea', { 'readonly': 'readonly', 'style': 'width:100%;min-height:45vh;font-family:monospace' }, [ text ]),
+		E('div', { 'class': 'right' }, [ E('button', { 'class': 'btn cbi-button', 'click': ui.hideModal }, [ _('Close') ]) ])
+	]);
+}
+
+function copyMarkdown(result, formatter) {
+	if (!result || !result.generated_at) {
+		ui.addNotification(null, E('p', {}, [ _('Run a check before copying Markdown.') ]), 'warning');
+		return Promise.resolve();
+	}
+
+	var text = formatter(result);
+	var copied = function() {
+		ui.addNotification(null, E('p', {}, [ _('Markdown copied to clipboard.') ]));
+	};
+	var fallback = function() {
+		if (fallbackCopy(text))
+			copied();
+		else
+			manualCopy(text);
+	};
+
+	if (navigator.clipboard && navigator.clipboard.writeText)
+		return navigator.clipboard.writeText(text).then(copied, fallback);
+
+	fallback();
+	return Promise.resolve();
+}
+
 function updateState(state) {
 	state = state || {};
 	setContent('ipregion-state-running', state.running ? _('Running') : _('Idle'));
@@ -780,6 +857,7 @@ function applyResult(result) {
 
 	if (result.generated_at)
 		currentGeneratedAt = result.generated_at;
+	latestResult = result.generated_at ? result : null;
 
 	updateNetwork(result);
 	updateErrors('ipregion-errors', result.errors);
@@ -796,6 +874,7 @@ function applyAiResult(result) {
 
 	if (result.generated_at)
 		aiGeneratedAt = result.generated_at;
+	latestAiResult = result.generated_at ? result : null;
 
 	updateAiEgress(result);
 	updateErrors('ipregion-ai-errors', result.errors);
@@ -810,6 +889,7 @@ function applyDnsResult(result) {
 		clearDnsRows();
 	if (result.generated_at)
 		dnsGeneratedAt = result.generated_at;
+	latestDnsResult = result.generated_at ? result : null;
 
 	updateDnsRows(result.probes || []);
 	updateErrors('ipregion-dns-errors', result.errors, dnsErrorText);
@@ -871,7 +951,7 @@ function routeOptions() {
 	return {
 		ip_mode: fieldValue('ipregion-ip-mode'),
 		interface: fieldValue('ipregion-interface'),
-		proxy: fieldValue('ipregion-proxy'),
+		proxy_profile: fieldValue('ipregion-proxy'),
 		timeout: fieldValue('ipregion-timeout')
 	};
 }
@@ -907,6 +987,9 @@ return view.extend({
 		currentGeneratedAt = result.generated_at || null;
 		aiGeneratedAt = aiResult.generated_at || null;
 		dnsGeneratedAt = dnsResult.generated_at || null;
+		latestResult = result.generated_at ? result : null;
+		latestAiResult = aiResult.generated_at ? aiResult : null;
+		latestDnsResult = dnsResult.generated_at ? dnsResult : null;
 
 		var page = E('div', { 'class': 'ipregion-page' }, [
 			E('link', { 'rel': 'stylesheet', 'href': L.resource('ipregion/ipregion.css') }),
@@ -925,6 +1008,10 @@ return view.extend({
 						group: fieldValue('ipregion-group'),
 						geoip_mode: fieldValue('ipregion-geoip-mode')
 					})).then(function(res) {
+						if (res && res.error) {
+							ui.addNotification(null, E('p', {}, [ _('IP Region check failed to start') + ': ' + routeStartError(res) ]), 'error');
+							return;
+						}
 						updateState(res || {});
 						ui.addNotification(null, E('p', {}, [ _('IP Region check started') ]));
 						return pollRegionOnce();
@@ -933,11 +1020,12 @@ return view.extend({
 				E('button', { 'id': 'ipregion-stop', 'class': 'btn cbi-button cbi-button-remove', 'disabled': state.running ? null : 'disabled', 'click': ui.createHandlerFn(this, function() { return callStop().then(pollRegionOnce); }) }, [ _('Stop') ]),
 				E('button', { 'class': 'btn cbi-button', 'click': pollRegionOnce }, [ _('Refresh result') ]),
 				E('button', { 'class': 'btn cbi-button', 'click': function() { callResult().then(function(res) { downloadJson(res, 'ipregion-result.json'); }); } }, [ _('Download JSON') ]),
+				E('button', { 'class': 'btn cbi-button', 'click': function() { return copyMarkdown(latestResult, markdown.regular); } }, [ _('Copy Markdown') ]),
 				E('button', { 'class': 'btn cbi-button', 'click': ui.createHandlerFn(this, function() { return callLog().then(function(res) { ui.showModal(_('Runtime log'), [ E('pre', {}, [ res.log || _('Log is empty') ]), E('div', { 'class': 'right' }, [ E('button', { 'class': 'btn cbi-button', 'click': ui.hideModal }, [ _('Close') ]) ]) ]); }); }) }, [ _('Show log') ]),
 				E('button', { 'class': 'btn cbi-button', 'click': ui.createHandlerFn(this, function() { return callSelftest().then(function(res) { ui.showModal(_('Self-test'), [ E('pre', {}, [ JSON.stringify(res, null, 2) ]), E('div', { 'class': 'right' }, [ E('button', { 'class': 'btn cbi-button', 'click': ui.hideModal }, [ _('Close') ]) ]) ]); }); }) }, [ _('Self-test') ]),
 				E('button', { 'class': 'btn cbi-button cbi-button-reset', 'click': ui.createHandlerFn(this, function() { resetResultUi(); return callClear().then(pollRegionOnce); }) }, [ _('Clear results') ])
 			]),
-			E('p', { 'class': 'ipregion-muted' }, [ _('Download JSON includes raw IP addresses.') ]),
+			E('p', { 'class': 'ipregion-muted' }, [ _('Download JSON includes raw IP addresses. Copied Markdown omits raw IP addresses, proxy endpoints and route identifiers.') ]),
 			E('div', { 'class': 'ipregion-card' }, [
 				E('h3', {}, [ _('Runtime state') ]),
 				E('p', { 'id': 'ipregion-state-running' }, [ state.running ? _('Running') : _('Idle') ]),
@@ -992,6 +1080,7 @@ return view.extend({
 				}) }, [ _('Stop') ]),
 				E('button', { 'class': 'btn cbi-button', 'click': pollDnsOnce }, [ _('Refresh result') ]),
 				E('button', { 'class': 'btn cbi-button', 'click': function() { callDnsResult().then(function(res) { downloadJson(res, 'ipregion-dns-result.json'); }); } }, [ _('Download JSON') ]),
+				E('button', { 'class': 'btn cbi-button', 'click': function() { return copyMarkdown(latestDnsResult, markdown.dns); } }, [ _('Copy Markdown') ]),
 				E('button', { 'class': 'btn cbi-button', 'click': ui.createHandlerFn(this, function() { return callDnsLog().then(function(res) { ui.showModal(_('Runtime log'), [ E('pre', {}, [ res.log || _('Log is empty') ]), E('div', { 'class': 'right' }, [ E('button', { 'class': 'btn cbi-button', 'click': ui.hideModal }, [ _('Close') ]) ]) ]); }); }) }, [ _('Show log') ]),
 				E('button', { 'id': 'ipregion-dns-clear', 'class': 'btn cbi-button cbi-button-reset', 'disabled': dnsState.running ? 'disabled' : null, 'click': ui.createHandlerFn(this, function() {
 					return callDnsClear().then(function(res) {
@@ -1021,7 +1110,7 @@ return view.extend({
 			E('div', { 'class': 'ipregion-hero ipregion-ai-hero' }, [
 				E('div', {}, [
 					E('h2', {}, [ _('AI Providers') ]),
-					E('p', {}, [ _('Check whether popular AI API endpoints are reachable through the selected route.') ])
+					E('p', {}, [ _('Check whether popular AI web and API endpoints are reachable through the selected route.') ])
 				])
 			]),
 			renderAiOptions(providers),
@@ -1033,6 +1122,10 @@ return view.extend({
 						category: fieldValue('ipregion-ai-category'),
 						providers: provider ? [ provider ] : []
 					})).then(function(res) {
+						if (res && res.error) {
+							ui.addNotification(null, E('p', {}, [ _('AI provider check failed to start') + ': ' + routeStartError(res) ]), 'error');
+							return;
+						}
 						updateAiState(res || {});
 						ui.addNotification(null, E('p', {}, [ _('AI provider check started') ]));
 						return pollAiOnce();
@@ -1041,10 +1134,11 @@ return view.extend({
 				E('button', { 'id': 'ipregion-ai-stop', 'class': 'btn cbi-button cbi-button-remove', 'disabled': aiState.running ? null : 'disabled', 'click': ui.createHandlerFn(this, function() { return callAiStop().then(pollAiOnce); }) }, [ _('Stop') ]),
 				E('button', { 'class': 'btn cbi-button', 'click': pollAiOnce }, [ _('Refresh result') ]),
 				E('button', { 'class': 'btn cbi-button', 'click': function() { callAiResult().then(function(res) { downloadJson(res, 'ipregion-ai-result.json'); }); } }, [ _('Download JSON') ]),
+				E('button', { 'class': 'btn cbi-button', 'click': function() { return copyMarkdown(latestAiResult, markdown.ai); } }, [ _('Copy Markdown') ]),
 				E('button', { 'class': 'btn cbi-button', 'click': ui.createHandlerFn(this, function() { return callAiLog().then(function(res) { ui.showModal(_('Runtime log'), [ E('pre', {}, [ res.log || _('Log is empty') ]), E('div', { 'class': 'right' }, [ E('button', { 'class': 'btn cbi-button', 'click': ui.hideModal }, [ _('Close') ]) ]) ]); }); }) }, [ _('Show log') ]),
 				E('button', { 'class': 'btn cbi-button cbi-button-reset', 'click': ui.createHandlerFn(this, function() { resetAiUi(); return callAiClear().then(pollAiOnce); }) }, [ _('Clear results') ])
 			]),
-			E('p', { 'class': 'ipregion-muted' }, [ _('Download JSON includes raw IP addresses.') ]),
+			E('p', { 'class': 'ipregion-muted' }, [ _('Download JSON includes raw IP addresses. Copied Markdown omits raw IP addresses, proxy endpoints and route identifiers.') ]),
 			E('div', { 'class': 'ipregion-card' }, [
 				E('h3', {}, [ _('Runtime state') ]),
 				E('p', { 'id': 'ipregion-ai-state-running' }, [ aiState.running ? _('Running') : _('Idle') ]),

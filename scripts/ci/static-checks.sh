@@ -56,6 +56,16 @@ for provider in ai_catalog:
     if not provider.get('url'):
         raise SystemExit(f'AI provider {provider_id} has no url')
 
+ai_by_id = {provider['id']: provider for provider in ai_catalog}
+gemini_web = ai_by_id.get('google_gemini_web', {})
+gemini_api = ai_by_id.get('google_gemini', {})
+if gemini_web.get('url') != 'https://gemini.google.com/app' or gemini_web.get('endpoint_role') != 'web':
+    raise SystemExit('google_gemini_web must probe the Gemini Web endpoint')
+if gemini_api.get('url') != 'https://generativelanguage.googleapis.com/v1beta/models' or gemini_api.get('endpoint_role') != 'api':
+    raise SystemExit('google_gemini must preserve the Gemini API endpoint')
+if services['GEMINI_SUPPORTED'].get('url') != gemini_web['url']:
+    raise SystemExit('regular and AI Gemini Web checks must use the same endpoint')
+
 dns_catalog = json.loads((root / 'ipregion/files/usr/share/ipregion/services-dns.json').read_text(encoding='utf-8'))
 dns_ids = set()
 for provider in dns_catalog.get('providers', []):
@@ -86,7 +96,9 @@ ubus_write = acl['luci-app-ipregion']['write']['ubus']
 if 'luci.ipregion' not in ubus_read or 'luci.ipregion' not in ubus_write:
     raise SystemExit('ACL must grant only luci.ipregion ubus methods')
 
-js = ''.join(p.read_text(encoding='utf-8') for p in (root / 'luci-app-ipregion/htdocs/luci-static/resources/view/ipregion').glob('*.js'))
+view_dir = root / 'luci-app-ipregion/htdocs/luci-static/resources/view/ipregion'
+markdown_js = root / 'luci-app-ipregion/htdocs/luci-static/resources/ipregion/markdown.js'
+js = ''.join(p.read_text(encoding='utf-8') for p in view_dir.glob('*.js')) + markdown_js.read_text(encoding='utf-8')
 messages = set(re.findall(r"_\('([^']+)'\)", js))
 pot = (root / 'luci-app-ipregion/po/templates/ipregion.pot').read_text(encoding='utf-8')
 po = (root / 'luci-app-ipregion/po/ru/ipregion.po').read_text(encoding='utf-8')
@@ -101,6 +113,10 @@ extra_pot = sorted(pot_messages - messages)
 extra_po = sorted(po_messages - messages)
 if extra_pot or extra_po:
     raise SystemExit(f'obsolete gettext strings: pot={extra_pot} po={extra_po}')
+
+settings_js = (view_dir / 'settings.js').read_text(encoding='utf-8')
+if 'p.anonymous = false;' not in settings_js or 'p.anonymous = true;' in settings_js:
+    raise SystemExit('proxy profiles must use stable named UCI sections')
 
 core = (root / 'ipregion/files/usr/share/ipregion/ipregion.uc').read_text(encoding='utf-8')
 ipregion_makefile = (root / 'ipregion/Makefile').read_text(encoding='utf-8')
@@ -149,5 +165,7 @@ sh -n "$ROOT_DIR/ipregion/files/etc/uci-defaults/90_ipregion"
 for js in "$ROOT_DIR"/luci-app-ipregion/htdocs/luci-static/resources/view/ipregion/*.js; do
 	node --check "$js"
 done
+node --check "$ROOT_DIR/luci-app-ipregion/htdocs/luci-static/resources/ipregion/markdown.js"
+node "$ROOT_DIR/scripts/ci/markdown-checks.js"
 
 printf 'static checks OK\n'
