@@ -1,4 +1,5 @@
 'use strict';
+'require baseclass';
 
 function isIpv6(value) {
 	if (value.indexOf(':') < 0 || /[^A-Fa-f0-9:.]/.test(value) || value.indexOf(':::') >= 0)
@@ -266,5 +267,5 @@ var api = { regular: regular, ai: ai, dns: dns, clean: clean };
 
 if (typeof module !== 'undefined' && module.exports)
 	module.exports = api;
-
-return api;
+else
+	return baseclass.extend(api);

@@ -73,9 +73,11 @@ wget -qO- https://raw.githubusercontent.com/romanilyin/ipregion-openwrt/main/ins
 
 Installer скачивает `ipregion*.apk`, `luci-app-ipregion*.apk` и `luci-i18n-ipregion-ru*.apk` из последнего GitHub Release и ставит их через `apk`.
 
+Release tags используют формат `YYYY.M.D-N`. В metadata пакета OpenWrt та же ревизия отображается как `YYYY.M.D-rN`, где `r` является стандартным маркером `PKG_RELEASE`.
+
 Опции APK installer:
 
-- `IPREGION_RELEASE=2026.9.2-1`: поставить конкретный GitHub release tag вместо `latest`.
+- `IPREGION_RELEASE=2026.9.2-2`: поставить конкретный GitHub release tag вместо `latest`.
 - `IPREGION_INSTALL_LUCI=0`: поставить только CLI/backend пакет.
 - `IPREGION_APK_UPDATE=0`: не запускать `apk update` перед установкой.
 - `IPREGION_DOWNLOAD_RETRIES=5`: увеличить число повторов для GitHub metadata и APK downloads.
@@ -83,7 +85,7 @@ Installer скачивает `ipregion*.apk`, `luci-app-ipregion*.apk` и `luci-
 Пример с фиксированным release:
 
 ```sh
-wget -qO- https://raw.githubusercontent.com/romanilyin/ipregion-openwrt/main/install.sh | IPREGION_RELEASE=2026.9.2-1 sh
+wget -qO- https://raw.githubusercontent.com/romanilyin/ipregion-openwrt/main/install.sh | IPREGION_RELEASE=2026.9.2-2 sh
 ```
 
 Ручная установка скачанных APK:

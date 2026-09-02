@@ -73,9 +73,11 @@ wget -qO- https://raw.githubusercontent.com/romanilyin/ipregion-openwrt/main/ins
 
 The installer downloads `ipregion*.apk`, `luci-app-ipregion*.apk` and `luci-i18n-ipregion-ru*.apk` from the latest GitHub Release and installs them with `apk`.
 
+Release tags use `YYYY.M.D-N`. OpenWrt package metadata displays the same package revision as `YYYY.M.D-rN`, where `r` is the standard `PKG_RELEASE` marker.
+
 APK installer options:
 
-- `IPREGION_RELEASE=2026.9.2-1`: install a specific GitHub release tag instead of `latest`.
+- `IPREGION_RELEASE=2026.9.2-2`: install a specific GitHub release tag instead of `latest`.
 - `IPREGION_INSTALL_LUCI=0`: install only the CLI/backend package.
 - `IPREGION_APK_UPDATE=0`: skip `apk update` before installation.
 - `IPREGION_DOWNLOAD_RETRIES=5`: retry GitHub metadata and APK downloads more times.
@@ -83,7 +85,7 @@ APK installer options:
 Pinned release example:
 
 ```sh
-wget -qO- https://raw.githubusercontent.com/romanilyin/ipregion-openwrt/main/install.sh | IPREGION_RELEASE=2026.9.2-1 sh
+wget -qO- https://raw.githubusercontent.com/romanilyin/ipregion-openwrt/main/install.sh | IPREGION_RELEASE=2026.9.2-2 sh
 ```
 
 Manual install from downloaded APK files:

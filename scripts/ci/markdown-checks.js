@@ -1,8 +1,20 @@
 'use strict';
 
 const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
 global._ = function(value) { return value; };
-const markdown = require('../../luci-app-ipregion/htdocs/luci-static/resources/ipregion/markdown.js');
+const modulePath = path.join(__dirname, '../../luci-app-ipregion/htdocs/luci-static/resources/ipregion/markdown.js');
+const markdown = require(modulePath);
+
+const factorySource = fs.readFileSync(modulePath, 'utf8');
+const luciConstructor = new Function('baseclass', '_', factorySource)({
+	extend: function(api) {
+		return function() { Object.assign(this, api); };
+	}
+}, global._);
+assert.strictEqual(typeof luciConstructor, 'function', 'LuCI module factory did not return a constructor');
+assert.strictEqual(typeof new luciConstructor().regular, 'function', 'LuCI module instance has no regular formatter');
 
 const secretValues = [
 	'203.0.113.42',
