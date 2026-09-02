@@ -6,6 +6,123 @@
 'require uci';
 
 var callDetectedCountry = rpc.declare({ object: 'luci.ipregion', method: 'detected_country', expect: { '': {} } });
+var callPackageInfo = rpc.declare({ object: 'luci.ipregion', method: 'package_info', expect: { '': {} } });
+var callRemoveKnotDig = rpc.declare({ object: 'luci.ipregion', method: 'remove_knot_dig', expect: { '': {} } });
+
+function formatBytes(value) {
+	if (value == null)
+		return _('N/A');
+	value = Number(value);
+	if (!isFinite(value) || value < 0)
+		return _('N/A');
+	if (value < 1024)
+		return value + ' B';
+	if (value < 1024 * 1024)
+		return (value / 1024).toFixed(1) + ' KiB';
+	return (value / (1024 * 1024)).toFixed(2) + ' MiB';
+}
+
+function packageById(info, id) {
+	var packages = info && info.packages || [];
+	for (var i = 0; i < packages.length; i++)
+		if (packages[i].id === id)
+			return packages[i];
+	return { id: id, installed: false };
+}
+
+function packageRow(info, id, label) {
+	var pkg = packageById(info, id);
+	var status = pkg.installed
+		? _('Installed') + (pkg.version ? ' (' + pkg.version + ')' : '')
+		: _('Not installed');
+
+	return E('tr', { 'class': 'tr' }, [
+		E('td', { 'class': 'td' }, [ label, E('div', { 'class': 'ipregion-muted' }, [ id ]) ]),
+		E('td', { 'class': 'td' }, [ status ]),
+		E('td', { 'class': 'td' }, [ pkg.installed ? formatBytes(pkg.file_size) : _('N/A') ]),
+		E('td', { 'class': 'td' }, [ pkg.installed ? formatBytes(pkg.installed_size) : _('N/A') ])
+	]);
+}
+
+function packageInfoCard(info) {
+	if (!info || info.manager !== 'apk' || !Array.isArray(info.packages))
+		return E('div', { 'class': 'cbi-section' }, [
+			E('h3', {}, [ _('Package footprint') ]),
+			E('p', { 'class': 'alert-message warning' }, [ _('Unavailable') ])
+		]);
+
+	var knot = packageById(info, 'knot-dig');
+	var rows = [
+		E('tr', { 'class': 'tr table-titles' }, [
+			E('th', { 'class': 'th' }, [ _('Package') ]),
+			E('th', { 'class': 'th' }, [ _('Status') ]),
+			E('th', { 'class': 'th' }, [ _('APK size') ]),
+			E('th', { 'class': 'th' }, [ _('Installed size') ])
+		]),
+		packageRow(info, 'ipregion', _('IPRegion backend')),
+		packageRow(info, 'ipregion-dns-helper', _('DNS transport helper')),
+		packageRow(info, 'luci-app-ipregion', _('LuCI application')),
+		packageRow(info, 'luci-i18n-ipregion-ru', _('Russian translation')),
+		packageRow(info, 'knot-dig', _('Legacy DNS utility'))
+	];
+	var legacyNodes = [];
+
+	if (knot.installed) {
+		var removableSize = info && info.knot_removable_size;
+		var removeButton = E('button', {
+			'class': 'btn cbi-button cbi-button-negative',
+			'type': 'button',
+			'click': function() {
+				ui.showModal(_('Remove knot-dig'), [
+					E('p', {}, [
+						_('IPRegion now uses its own DNS helper. Removing knot-dig will also remove dependencies that no other package needs.'),
+						removableSize != null ? ' ' + _('Estimated space to reclaim') + ': ' + formatBytes(removableSize) + '.' : ''
+					]),
+					E('div', { 'class': 'right' }, [
+						E('button', { 'class': 'btn', 'click': ui.hideModal }, [ _('Cancel') ]),
+						' ',
+						E('button', {
+							'class': 'btn cbi-button-negative',
+							'click': function() {
+								ui.hideModal();
+								removeButton.disabled = true;
+								return callRemoveKnotDig().then(function(result) {
+									if (!result || !result.ok || result.installed)
+										throw new Error(result && (result.message || result.error) || _('Package removal failed'));
+									ui.addNotification(null, E('p', {}, [ _('knot-dig was removed. Dependencies still needed by other packages were kept.') ]));
+									window.location.reload();
+								}).catch(function(error) {
+									removeButton.disabled = false;
+									ui.addNotification(null, E('p', {}, [ _('Could not remove knot-dig') + ': ' + error.message ]), 'error');
+								});
+							}
+						}, [ _('Remove') ])
+					])
+				]);
+			}
+		}, [ _('Remove knot-dig') ]);
+
+		legacyNodes = [
+			E('p', { 'class': 'alert-message warning' }, [ _('knot-dig is left from an older IPRegion release and is no longer used. Remove it if no other application needs it or if you do not need it separately.') ]),
+			removeButton
+		];
+	}
+	else {
+		legacyNodes = [ E('p', { 'class': 'ipregion-muted' }, [ _('knot-dig is not installed and is not required by IPRegion.') ]) ];
+	}
+
+	return E('div', { 'class': 'cbi-section' }, [
+		E('h3', {}, [ _('Package footprint') ]),
+		E('p', {}, [ _('The DNS helper replaces kdig and provides UDP, TCP and certificate-verified DNS-over-TLS using the existing libcurl library.') ]),
+		E('p', { 'class': 'ipregion-muted' }, [ _('APK size is the compressed download size. Installed size is the package footprint in flash storage.') ]),
+		E('div', { 'class': 'ipregion-table-card' }, [ E('table', { 'class': 'table' }, rows) ]),
+		E('p', {}, [
+			E('strong', {}, [ _('Installed IPRegion packages total') + ': ' ]),
+			formatBytes(info && info.total_installed_size),
+			' (' + _('APK') + ': ' + formatBytes(info && info.total_file_size) + ')'
+		])
+	].concat(legacyNodes));
+}
 
 function referenceCountryInput(section_id) {
 	return document.getElementById('widget.cbid.ipregion.' + section_id + '.reference_country') ||
@@ -24,11 +141,15 @@ function setReferenceCountry(section_id, value) {
 
 return view.extend({
 	load: function() {
-		return uci.load('ipregion');
+		return Promise.all([
+			uci.load('ipregion'),
+			callPackageInfo().catch(function() { return null; })
+		]);
 	},
 
-	render: function() {
+	render: function(data) {
 		var m, s, p, o;
+		var packageInfo = data && data[1] || {};
 		var profiles = uci.sections('ipregion', 'proxy') || [];
 		var legacyProxy = uci.get('ipregion', 'main', 'proxy') || '';
 		var selectedProxy = uci.get('ipregion', 'main', 'proxy_profile') || (legacyProxy ? 'legacy' : 'none');
@@ -182,7 +303,9 @@ return view.extend({
 
 		return m.render().then(function(node) {
 			return E('div', {}, [
+				E('link', { 'rel': 'stylesheet', 'href': L.resource('ipregion/ipregion.css') }),
 				node,
+				packageInfoCard(packageInfo),
 				E('div', { 'class': 'cbi-section' }, [
 					E('h3', {}, [ _('Where to see results') ]),
 					E('p', {}, [ _('Run checks and inspect results on the Status page.') ]),

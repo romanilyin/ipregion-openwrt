@@ -221,7 +221,7 @@ function stop_process_group(pid, expected_start) {
 
 function clear_dns_temp_files() {
 	for (let entry in fs.lsdir(RUN_DIR) || [])
-		if (match(entry, /^doh-[A-Za-z0-9_.:-]+-[46]-[0-9]+(\.[0-9]+)?\.bin$/))
+		if (match(entry, /^(doh-[A-Za-z0-9_.:-]+-[46]|dns-(query|response)-[A-Za-z0-9_.:-]+-(udp|tcp|dot)-[46])-[0-9]+(\.[0-9]+)?\.bin$/))
 			fs.unlink(RUN_DIR + '/' + entry);
 }
 
@@ -438,6 +438,94 @@ function package_version(pkg) {
 	}
 
 	return null;
+}
+
+function apk_package_info(pkg) {
+	let fallback = { id: pkg, installed: false, version: null, file_size: null, installed_size: null };
+	if (!command_exists('apk'))
+		return fallback;
+
+	let output = read_command([ 'apk', 'query', '--from', 'installed', '--fields', 'name,version,file-size,installed-size', '--format', 'json', pkg ]);
+	try {
+		let rows = json(output || '[]');
+		if (type(rows) != 'array' || length(rows) == 0)
+			return fallback;
+		let row = rows[0];
+		return {
+			id: pkg,
+			installed: row.name == pkg,
+			version: row.version || null,
+			file_size: int(row['file-size']),
+			installed_size: int(row['installed-size'])
+		};
+	}
+	catch (e) {
+		return fallback;
+	}
+}
+
+function project_package_info() {
+	if (!command_exists('apk'))
+		return {
+			manager: null,
+			packages: null,
+			total_file_size: null,
+			total_installed_size: null,
+			knot_removable_size: null
+		};
+
+	let packages = [];
+	let total_file_size = 0;
+	let total_installed_size = 0;
+
+	for (let id in [ 'ipregion', 'ipregion-dns-helper', 'luci-app-ipregion', 'luci-i18n-ipregion-ru', 'knot-dig' ]) {
+		let info = apk_package_info(id);
+		push(packages, info);
+		if (id != 'knot-dig' && info.installed) {
+			total_file_size += info.file_size || 0;
+			total_installed_size += info.installed_size || 0;
+		}
+	}
+
+	let knot_removable_size = null;
+	if (apk_package_info('knot-dig').installed) {
+		let simulation = read_command([ 'apk', 'del', '--simulate', 'knot-dig' ]);
+		knot_removable_size = 0;
+		for (let line in split(simulation, '\n')) {
+			let found = match(line, /Purging ([A-Za-z0-9+_.-]+) \(/);
+			if (found) {
+				let removable = apk_package_info(found[1]);
+				knot_removable_size += removable.installed_size || 0;
+			}
+		}
+		if (knot_removable_size == 0)
+			knot_removable_size = null;
+	}
+
+	return {
+		manager: 'apk',
+		packages: packages,
+		total_file_size: total_file_size,
+		total_installed_size: total_installed_size,
+		knot_removable_size: knot_removable_size
+	};
+}
+
+function remove_legacy_kdig() {
+	if (!command_exists('apk'))
+		return { ok: false, error: 'apk_unavailable', message: 'apk package manager is unavailable' };
+	if (!apk_package_info('knot-dig').installed)
+		return { ok: true, installed: false, message: 'knot-dig is not installed' };
+
+	let pipe = fs.popen(shell_cmd([ 'apk', 'del', 'knot-dig' ]) + ' 2>&1', 'r');
+	let output = pipe ? pipe.read('all') : '';
+	let exit_code = pipe ? pipe.close() : 127;
+	return {
+		ok: exit_code == 0,
+		installed: apk_package_info('knot-dig').installed,
+		exit_code: exit_code,
+		message: substr(trim_str(output), 0, 8192)
+	};
 }
 
 function normalize_version(value) {
@@ -746,6 +834,18 @@ const methods = {
 	detected_country: {
 		call: function(req) {
 			return detected_country_from_result();
+		}
+	},
+
+	package_info: {
+		call: function(req) {
+			return project_package_info();
+		}
+	},
+
+	remove_knot_dig: {
+		call: function(req) {
+			return remove_legacy_kdig();
 		}
 	},
 

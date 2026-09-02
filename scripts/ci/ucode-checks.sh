@@ -84,6 +84,31 @@ esac
 EOF
 chmod 0755 "$FAKE_BIN/curl"
 
+cat >"$FAKE_BIN/dns-helper" <<'EOF'
+#!/usr/bin/env python3
+import pathlib
+import sys
+
+response = bytearray(pathlib.Path(sys.argv[7]).read_bytes())
+response[2:4] = b'\x81\x80'
+pathlib.Path(sys.argv[8]).write_bytes(response)
+EOF
+chmod 0755 "$FAKE_BIN/dns-helper"
+
+cat >"$FAKE_BIN/ip" <<'EOF'
+#!/bin/sh
+case "$*" in
+	*'route show default'*) printf 'default via 127.0.0.1 dev wan\n' ;;
+esac
+EOF
+chmod 0755 "$FAKE_BIN/ip"
+
+cat >"$FAKE_BIN/ubus" <<'EOF'
+#!/bin/sh
+printf '%s\n' '{"interface":[{"interface":"wan","l3_device":"wan","up":true,"dns-server":["127.0.0.1"]}]}'
+EOF
+chmod 0755 "$FAKE_BIN/ubus"
+
 expect_failure() {
 	if "$@" >/dev/null 2>&1; then
 		printf 'expected command to fail: %s\n' "$*" >&2
@@ -117,6 +142,20 @@ IPREGION_CATALOG_PATH="$ROOT_DIR/ipregion/files/usr/share/ipregion/services.json
 IPREGION_DNS_CATALOG_PATH="$ROOT_DIR/ipregion/files/usr/share/ipregion/services-dns.json" \
 IPREGION_RUNTIME_DIR="$OUT_DIR/runtime" \
 	"$UCODE" "$ROOT_DIR/ipregion/files/usr/share/ipregion/ipregion.uc" --no-uci --list-dns-providers --json >/dev/null
+
+for transport in udp tcp dot; do
+	IPREGION_CATALOG_PATH="$ROOT_DIR/ipregion/files/usr/share/ipregion/services.json" \
+	IPREGION_DNS_CATALOG_PATH="$ROOT_DIR/ipregion/files/usr/share/ipregion/services-dns.json" \
+	IPREGION_DNS_HELPER_PATH="$FAKE_BIN/dns-helper" \
+	IPREGION_RUNTIME_DIR="$OUT_DIR/runtime-dns-$transport" \
+		"$UCODE" "$ROOT_DIR/ipregion/files/usr/share/ipregion/ipregion.uc" dns --no-uci --provider google --transport "$transport" --ip-mode ipv4 --json >"$OUT_DIR/dns-$transport.json"
+done
+PATH="$FAKE_BIN:$PATH" \
+IPREGION_CATALOG_PATH="$ROOT_DIR/ipregion/files/usr/share/ipregion/services.json" \
+IPREGION_DNS_CATALOG_PATH="$ROOT_DIR/ipregion/files/usr/share/ipregion/services-dns.json" \
+IPREGION_DNS_HELPER_PATH="$FAKE_BIN/dns-helper" \
+IPREGION_RUNTIME_DIR="$OUT_DIR/runtime-dns-interface" \
+	"$UCODE" "$ROOT_DIR/ipregion/files/usr/share/ipregion/ipregion.uc" dns --no-uci --provider interface_dns --transport plain --ip-mode ipv4 --json >"$OUT_DIR/dns-interface.json"
 expect_failure env IPREGION_CATALOG_PATH="$ROOT_DIR/ipregion/files/usr/share/ipregion/services.json" \
 	IPREGION_DNS_CATALOG_PATH="$ROOT_DIR/ipregion/files/usr/share/ipregion/services-dns.json" \
 	IPREGION_RUNTIME_DIR="$OUT_DIR/runtime" \
@@ -295,6 +334,24 @@ assert 'socks5h://legacy-proxy.test:8000' in log('proxy-profile-legacy')
 assert 'socks5h://override-proxy.test:9000' in log('proxy-cli-override')
 assert 'proxy-europe.test:6000' not in log('proxy-cli-override')
 print('proxy profile checks OK')
+PY
+
+python3 - "$OUT_DIR" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+for transport in ('udp', 'tcp', 'dot'):
+    result = json.loads((root / f'dns-{transport}.json').read_text(encoding='utf-8'))
+    assert not result['errors'], result
+    assert len(result['probes']) == 1, result
+    assert result['probes'][0]['transport'] == transport, result
+    assert result['probes'][0]['status'] == 'no_answer', result
+interface_result = json.loads((root / 'dns-interface.json').read_text(encoding='utf-8'))
+assert not interface_result['errors'], interface_result
+assert [probe['status'] for probe in interface_result['probes']] == ['no_answer', 'no_answer'], interface_result
+print('DNS helper integration checks OK')
 PY
 
 "$UCODE" "$ROOT_DIR/ipregion/files/usr/share/ipregion/http.uc" >/dev/null

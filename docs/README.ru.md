@@ -26,7 +26,7 @@
 
 IPRegion это CLI и LuCI-приложение для OpenWrt, которое проверяет, как GeoIP API, популярные сервисы, CDN endpoint-ы и AI-провайдеры видят маршрут роутера, а также сравнивает ответы публичных DNS через UDP, TCP, DoH и DoT.
 
-Проверенные runtime-цели: OpenWrt 25.12.1+ с `apk` и OpenWrt 24.10.6 с `opkg`.
+Проверенная runtime-цель текущей версии: OpenWrt 25.12.1+ с `apk`. Поддержка OpenWrt 24.10.* остается экспериментальной, а ее installer закреплен на более старом проверенном релизе пакетов.
 
 ## Что Делает
 
@@ -42,10 +42,11 @@ IPRegion запускает диагностику на самом роутер�
 Пакеты:
 
 - `ipregion`: CLI/backend диагностики на `ucode`.
+- `ipregion-dns-helper`: небольшой architecture-specific helper транспортов UDP, TCP и DoT с проверкой сертификата.
 - `luci-app-ipregion`: LuCI UI в `Status -> IP Region`.
 - `luci-i18n-ipregion-ru`: русский перевод LuCI.
 
-Release-пакеты `ipregion`, `luci-app-ipregion` и `luci-i18n-ipregion-ru` собираются как `noarch`. APK assets предназначены для OpenWrt 25.12.1+; IPK assets предназначены для OpenWrt 24.10.*.
+Release-пакеты `ipregion`, `luci-app-ipregion` и `luci-i18n-ipregion-ru` собираются как `noarch`. Нативный `ipregion-dns-helper` собирается отдельно для каждой package architecture OpenWrt и использует уже установленную для IPRegion зависимость `libcurl`. Текущие APK assets поддерживают `aarch64_cortex-a53`, `x86_64`, `mipsel_24kc` и `mips_24kc`. Закрепленный legacy IPK release предназначен для OpenWrt 24.10.*.
 
 ## Скриншоты
 
@@ -71,7 +72,9 @@ Release-пакеты `ipregion`, `luci-app-ipregion` и `luci-i18n-ipregion-ru` 
 wget -qO- https://raw.githubusercontent.com/romanilyin/ipregion-openwrt/main/install.sh | sh
 ```
 
-Installer скачивает `ipregion*.apk`, `luci-app-ipregion*.apk` и `luci-i18n-ipregion-ru*.apk` из последнего GitHub Release и ставит их через `apk`.
+Installer определяет `DISTRIB_ARCH`, скачивает соответствующий `ipregion-dns-helper-<architecture>.apk` и общие assets `ipregion*.apk`, `luci-app-ipregion*.apk`, `luci-i18n-ipregion-ru*.apk` из последнего GitHub Release и ставит их через `apk`.
+
+Для установки нужна одна из перечисленных выше package architectures. Для других архитектур OpenWrt требуется отдельно собрать и опубликовать APK `ipregion-dns-helper`.
 
 Release tags используют формат `YYYY.M.D-N`. В metadata пакета OpenWrt та же ревизия отображается как `YYYY.M.D-rN`, где `r` является стандартным маркером `PKG_RELEASE`.
 
@@ -81,6 +84,7 @@ Release tags используют формат `YYYY.M.D-N`. В metadata пак�
 - `IPREGION_INSTALL_LUCI=0`: поставить только CLI/backend пакет.
 - `IPREGION_APK_UPDATE=0`: не запускать `apk update` перед установкой.
 - `IPREGION_DOWNLOAD_RETRIES=5`: увеличить число повторов для GitHub metadata и APK downloads.
+- `IPREGION_PACKAGE_ARCH=aarch64_cortex-a53`: переопределить package architecture для apk-based производной OpenWrt.
 
 Пример с фиксированным release:
 
@@ -91,7 +95,8 @@ wget -qO- https://raw.githubusercontent.com/romanilyin/ipregion-openwrt/main/ins
 Ручная установка скачанных APK:
 
 ```sh
-apk add --allow-untrusted ./ipregion-*.apk ./luci-app-ipregion-*.apk ./luci-i18n-ipregion-ru-*.apk
+. /etc/openwrt_release
+apk add --allow-untrusted "./ipregion-dns-helper-${DISTRIB_ARCH}.apk" ./ipregion.apk ./luci-app-ipregion.apk ./luci-i18n-ipregion-ru.apk
 ```
 
 ## Установка IPK
@@ -102,7 +107,7 @@ apk add --allow-untrusted ./ipregion-*.apk ./luci-app-ipregion-*.apk ./luci-i18n
 wget -qO- https://raw.githubusercontent.com/romanilyin/ipregion-openwrt/main/install-ipk.sh | sh
 ```
 
-IPK installer по умолчанию использует последний релиз, проверенный на реальном OpenWrt 24.10, `2026.5.28-1`, и ставит его assets `ipregion*.ipk`, `luci-app-ipregion*.ipk` и `luci-i18n-ipregion-ru*.ipk` через `opkg`. Задавайте `IPREGION_RELEASE` только для другого релиза, в котором явно опубликованы проверенные IPK assets.
+Экспериментальный IPK installer по умолчанию использует последний релиз, проверенный на реальном OpenWrt 24.10, `2026.5.28-1`, и ставит его assets `ipregion*.ipk`, `luci-app-ipregion*.ipk` и `luci-i18n-ipregion-ru*.ipk` через `opkg`. Текущее разделение пакетов с нативным helper пока не поддерживается этим installer. Задавайте `IPREGION_RELEASE` только для релиза, в котором явно опубликован совместимый и проверенный набор IPK assets.
 
 Ручная установка скачанных IPK:
 
@@ -123,6 +128,7 @@ opkg install ./ipregion*.ipk ./luci-app-ipregion*.ipk ./luci-i18n-ipregion-ru*.i
 - Скачивайте исходный JSON или копируйте безопасные для публикации Markdown-таблицы. Markdown не содержит исходные IP-адреса, endpoint-ы прокси и идентификаторы маршрута.
 - Обновляйте пакет из GitHub Releases через карточку версии; защита от downgrade не даст установить более старый latest release.
 - Откройте `Services -> IP Region` для UCI-настроек по умолчанию.
+- Страница настроек показывает размер скачиваемого APK и установленный размер каждого пакета IPRegion. Там же можно удалить устаревший `knot-dig`, оставшийся от прежнего релиза.
 
 ## CLI
 
@@ -168,6 +174,7 @@ ipregion dns --provider interface_dns --transport plain --ip-mode ipv4 --json
 - `401`, `403`, `404`, `405` и `429` в AI mode могут означать, что endpoint достигнут; DNS, TLS, timeout и network failures классифицируются отдельно.
 - Google Gemini Web использует `gemini.google.com`, а отдельная проверка Gemini API использует `generativelanguage.googleapis.com`. Domain-based split routing должен охватывать каждый hostname, который требуется направлять в VPN.
 - Проверки публичных DNS подключаются к опубликованным IP резолверов; DoH и DoT дополнительно проверяют TLS-имя провайдера. DNS-адреса интерфейса читаются из выбранного или активного default-интерфейса OpenWrt и проверяются только через UDP/TCP.
+- UDP, TCP и DoT используют небольшой нативный DNS helper IPRegion. DoT проверяет CA, hostname и SNI через уже имеющийся TLS backend `libcurl`; `knot-dig` не требуется.
 - DNS mode игнорирует сохраненный в UCI proxy и отклоняет явный `--proxy`; DoH привязывается к выбранному интерфейсу, а UDP, TCP и DoT - к исходному адресу этого интерфейса.
 - DNS mode `auto` предпочитает доступный IPv4 default route и переключается на IPv6 на IPv6-only роутерах; для явной проверки обоих используйте `--ip-mode both`.
 - Результат `вероятен перехват` требует расхождения кода ответа с аутентифицированным DNS. Совпадающие ответы означают только отсутствие обнаруженного расхождения, а различия только в адресах остаются неоднозначными из-за допустимых вариаций CDN.

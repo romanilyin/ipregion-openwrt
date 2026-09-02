@@ -580,8 +580,8 @@ msgstr "Сравнение на перехват выполняется"
 msgid "Interception comparison not run"
 msgstr "Сравнение на перехват не выполнялось"
 
-msgid "kdig is required for UDP, TCP and DNS-over-TLS checks"
-msgstr "Для проверок UDP, TCP и DNS-over-TLS требуется kdig"
+msgid "IPRegion DNS helper is required for UDP, TCP and DNS-over-TLS checks"
+msgstr "Для проверок UDP, TCP и DNS-over-TLS требуется DNS helper IPRegion"
 
 msgid "DNS results"
 msgstr "Результаты DNS"
@@ -645,6 +645,81 @@ msgstr "Профили SOCKS5 proxy"
 
 msgid "Selected SOCKS5 proxy profile does not exist or is invalid"
 msgstr "Выбранный профиль SOCKS5 proxy не существует или некорректен"
+
+msgid "APK"
+msgstr "APK"
+
+msgid "APK size"
+msgstr "Размер APK"
+
+msgid "APK size is the compressed download size. Installed size is the package footprint in flash storage."
+msgstr "Размер APK показывает объем скачиваемого архива. Установленный размер показывает место, занятое пакетом во flash-памяти."
+
+msgid "Cancel"
+msgstr "Отмена"
+
+msgid "Could not remove knot-dig"
+msgstr "Не удалось удалить knot-dig"
+
+msgid "DNS transport helper"
+msgstr "Транспортный DNS helper"
+
+msgid "Estimated space to reclaim"
+msgstr "Ожидаемое освобождаемое место"
+
+msgid "IPRegion backend"
+msgstr "Backend IPRegion"
+
+msgid "IPRegion now uses its own DNS helper. Removing knot-dig will also remove dependencies that no other package needs."
+msgstr "Теперь IPRegion использует собственный DNS helper. При удалении knot-dig также будут удалены зависимости, не нужные другим пакетам."
+
+msgid "Installed"
+msgstr "Установлен"
+
+msgid "Installed IPRegion packages total"
+msgstr "Всего установлено пакетами IPRegion"
+
+msgid "Installed size"
+msgstr "Установленный размер"
+
+msgid "Legacy DNS utility"
+msgstr "Прежняя DNS-утилита"
+
+msgid "LuCI application"
+msgstr "Приложение LuCI"
+
+msgid "Not installed"
+msgstr "Не установлен"
+
+msgid "Package"
+msgstr "Пакет"
+
+msgid "Package footprint"
+msgstr "Размер пакетов"
+
+msgid "Package removal failed"
+msgstr "Не удалось удалить пакет"
+
+msgid "Remove"
+msgstr "Удалить"
+
+msgid "Remove knot-dig"
+msgstr "Удалить knot-dig"
+
+msgid "Russian translation"
+msgstr "Русский перевод"
+
+msgid "The DNS helper replaces kdig and provides UDP, TCP and certificate-verified DNS-over-TLS using the existing libcurl library."
+msgstr "DNS helper заменяет kdig и выполняет проверки UDP, TCP и DNS-over-TLS с проверкой сертификата через уже установленную библиотеку libcurl."
+
+msgid "knot-dig is left from an older IPRegion release and is no longer used. Remove it if no other application needs it or if you do not need it separately."
+msgstr "knot-dig остался от прежней версии IPRegion и больше не используется. Удалите его, если он не нужен другому приложению или отдельно от IPRegion."
+
+msgid "knot-dig is not installed and is not required by IPRegion."
+msgstr "knot-dig не установлен и больше не требуется IPRegion."
+
+msgid "knot-dig was removed. Dependencies still needed by other packages were kept."
+msgstr "knot-dig удален. Зависимости, которые нужны другим пакетам, сохранены."
 
 msgid "Used by default for GeoIP, service and AI checks. New profiles appear here after the settings are saved and reloaded."
 msgstr "Используется по умолчанию для проверок GeoIP, сервисов и AI. Новые профили появятся здесь после сохранения и перезагрузки настроек."

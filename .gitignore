@@ -3,6 +3,8 @@ ipregion_original/
 *.apk
 *.ipk
 *.log
+__pycache__/
+*.py[cod]
 uc.out
 *.uc.out
-AGENTS.md 
+AGENTS.md

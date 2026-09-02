@@ -4,12 +4,12 @@ This document collects the technical details that are useful for maintainers, co
 
 ## Scope
 
-- Validated OpenWrt targets: `25.12.1+` with `apk`, and `24.10.6` with `opkg`.
+- Validated current OpenWrt target: `25.12.1+` with `apk`. Current `24.10.*` work is experimental until real-router validation.
 - Keep APK and IPK install flows separate; do not mix package managers in one installer.
 - `ipregion` is a `ucode` CLI/backend package.
 - `luci-app-ipregion` is a LuCI app backed by a narrow rpcd/ubus API.
 - `luci-i18n-ipregion-ru` provides the Russian LuCI translation.
-- Packages are script-only/noarch unless native code is introduced later.
+- The core and LuCI packages are noarch; `ipregion-dns-helper` contains target-native code.
 
 This port intentionally does not wrap the upstream Bash implementation. Runtime dependencies on `bash`, `jq`, `column` and `grep -P` are avoided; OpenWrt runtime dependencies belong in package metadata.
 
@@ -56,7 +56,7 @@ scripts/build-sdk-packages.sh ramips/mt7621
 scripts/build-sdk-packages.sh ath79/generic
 ```
 
-The packages are noarch, but testing several SDK targets catches feed, dependency and package metadata issues.
+The core and LuCI packages are noarch. `ipregion-dns-helper` is native, so all release package architectures must compile and test it.
 
 24.10 SDK smoke:
 
@@ -64,7 +64,7 @@ The packages are noarch, but testing several SDK targets catches feed, dependenc
 OPENWRT_VERSION=24.10.6 scripts/build-sdk-packages.sh mediatek/filogic
 ```
 
-The official 24.10.6 SDK emits IPK package files for this smoke build. Runtime installation for 24.10 uses the separate `install-ipk.sh` entrypoint and `opkg`.
+The official 24.10.6 SDK emits IPK package files for this smoke build. The current native-helper IPK package set and installer must not be published until install, CLI, rpcd and LuCI pass on real 24.10 hardware; `install-ipk.sh` remains pinned to the older validated release meanwhile.
 
 If a local throwaway host lacks OpenWrt SDK prerequisites, `IPREGION_SKIP_PREREQ=1` can bypass SDK prerequisite probing. Do not use that as proof for official package readiness; install the missing SDK host dependencies for real verification.
 
@@ -135,7 +135,7 @@ Endpoint failures must remain per-service and must not abort the whole run.
 - Validate user-controlled `interface`, `proxy` and service/provider ids before they affect commands.
 - Do not add firewall, nftables, mwan3, podkop, WARP or routing changes.
 - This app is diagnostics-only and makes outbound UDP/53, TCP/53, HTTPS/443 and authenticated DNS-over-TLS/853 requests.
-- `knot-dig` provides strict DoT certificate and hostname validation; keep it in package `DEPENDS`.
+- `ipregion-dns-helper` sends UDP/TCP queries directly and uses `libcurl` connect-only TLS for DoT. Keep CA, hostname and SNI verification enabled.
 - SOCKS5 checks should support local DNS through `socks5://` and remote DNS through `socks5h://`.
 - Gemini Web and API probes are independent and require split-routing coverage for `gemini.google.com` and `generativelanguage.googleapis.com` respectively.
 - Debug/log output must stay local under `/tmp/run/ipregion/`.
@@ -145,7 +145,7 @@ Endpoint failures must remain per-service and must not abort the whole run.
 The public GitHub Release APK installer is `install.sh` at the repository root. The public IPK installer for OpenWrt 24.10 is `install-ipk.sh`.
 
 - It reads GitHub Release metadata, retries transient failures and falls back to direct stable asset URLs if GitHub API metadata is unavailable.
-- It downloads `ipregion*.apk`, `luci-app-ipregion*.apk` and `luci-i18n-ipregion-ru*.apk`.
+- It downloads the `ipregion-dns-helper-<architecture>.apk` matching `DISTRIB_ARCH` and the common `ipregion*.apk`, `luci-app-ipregion*.apk` and `luci-i18n-ipregion-ru*.apk` assets.
 - It installs with `apk` and `--allow-untrusted` by default because GitHub Release APKs are not from the official OpenWrt package repository.
 - It supports `IPREGION_RELEASE`, `IPREGION_INSTALL_LUCI`, `IPREGION_APK_UPDATE`, `IPREGION_REPO`, `IPREGION_GITHUB_API`, `IPREGION_GITHUB_DOWNLOAD_BASE`, `IPREGION_DOWNLOAD_RETRIES`, `IPREGION_DOWNLOAD_RETRY_DELAY` and `IPREGION_APK_FLAGS`.
 - `install-ipk.sh` defaults to the latest release validated on real OpenWrt 24.10 hardware, downloads matching `.ipk` assets and installs them with `opkg`; it supports `IPREGION_RELEASE`, `IPREGION_OPKG_UPDATE` and `IPREGION_OPKG_FLAGS` instead of APK-specific options.
@@ -156,7 +156,7 @@ Before publishing a release:
 - run `scripts/ci/static-checks.sh`
 - run `scripts/ci/ucode-checks.sh` with a local `ucode` build
 - build packages in an OpenWrt SDK
-- upload versioned APK assets and stable aliases named `ipregion.apk`, `luci-app-ipregion.apk` and `luci-i18n-ipregion-ru.apk`
+- upload architecture-specific helper aliases such as `ipregion-dns-helper-aarch64_cortex-a53.apk`, plus versioned APK assets and stable aliases named `ipregion.apk`, `luci-app-ipregion.apk` and `luci-i18n-ipregion-ru.apk`
 - publish versioned IPK assets and the `ipregion.ipk`, `luci-app-ipregion.ipk` and `luci-i18n-ipregion-ru.ipk` aliases only after the current package version passes install, CLI, rpcd and LuCI smoke tests on real OpenWrt 24.10 hardware; otherwise keep `install-ipk.sh` pinned to the last validated IPK release
 - run focused router smoke tests
 - verify LuCI after hard refresh and `rpcd` restart

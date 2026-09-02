@@ -130,6 +130,10 @@ if f'PKG_VERSION:={pkg_version}' not in luci_makefile or f'PKG_RELEASE:={pkg_rel
     raise SystemExit('LuCI and core package versions differ')
 if f'ipregion (>={pkg_version}-r{pkg_release})' not in luci_makefile:
     raise SystemExit('LuCI core dependency does not match the package version')
+if '+knot-dig' in ipregion_makefile or '+ipregion-dns-helper' not in ipregion_makefile:
+    raise SystemExit('core package must use the native DNS helper instead of knot-dig')
+if 'define Package/ipregion-dns-helper' not in ipregion_makefile or '+libcurl' not in ipregion_makefile:
+    raise SystemExit('native DNS helper package definition is incomplete')
 
 dns_transports = "[ 'all', 'plain', 'udp', 'tcp', 'both', 'doh', 'dot' ]"
 rpcd = (root / 'luci-app-ipregion/root/usr/share/rpcd/ucode/ipregion.uc').read_text(encoding='utf-8')
@@ -137,6 +141,8 @@ if f'const VALID_DNS_TRANSPORTS = {dns_transports};' not in core or core.count("
     raise SystemExit('CLI DNS transport enum or default is out of sync')
 if rpcd.count(dns_transports) != 2 or "'all');" not in rpcd:
     raise SystemExit('rpcd DNS transport enum or default is out of sync')
+if 'kdig_probe' in core or "code: 'kdig_missing'" in core or 'dns_helper_missing' not in core:
+    raise SystemExit('DNS transport implementation still requires kdig')
 
 install_sh = (root / 'install.sh').read_text(encoding='utf-8')
 install_ipk = (root / 'install-ipk.sh').read_text(encoding='utf-8')
@@ -144,6 +150,8 @@ if 'opkg' in install_sh:
     raise SystemExit('install.sh must stay APK-only; put opkg logic in install-ipk.sh')
 if 'apk add' in install_ipk or '.apk' in install_ipk:
     raise SystemExit('install-ipk.sh must stay IPK-only; put apk package install logic in install.sh')
+if 'ipregion-dns-helper-$package_arch' not in install_sh:
+    raise SystemExit('APK installer must select the native DNS helper for DISTRIB_ARCH')
 
 print(f'Service catalog OK: {len(services)} services')
 print(f'AI provider catalog OK: {len(ai_catalog)} providers')

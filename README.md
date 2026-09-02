@@ -26,7 +26,7 @@
 
 IPRegion is an OpenWrt CLI and LuCI app for checking how GeoIP APIs, popular services, CDN endpoints and AI providers see your router route, and comparing public DNS responses over UDP, TCP, DoH and DoT.
 
-Validated runtime targets: OpenWrt 25.12.1+ with `apk`, and OpenWrt 24.10.6 with `opkg`.
+Validated current runtime target: OpenWrt 25.12.1+ with `apk`. OpenWrt 24.10.* support remains experimental and its installer is pinned to an older validated package release.
 
 ## What It Does
 
@@ -42,10 +42,11 @@ IPRegion runs diagnostics from the router itself and compares independent servic
 Packages:
 
 - `ipregion`: CLI/backend diagnostics implemented in `ucode`.
+- `ipregion-dns-helper`: small architecture-specific UDP, TCP and certificate-verified DoT transport helper.
 - `luci-app-ipregion`: LuCI UI under `Status -> IP Region`.
 - `luci-i18n-ipregion-ru`: Russian LuCI translation.
 
-The release `ipregion`, `luci-app-ipregion` and `luci-i18n-ipregion-ru` packages are `noarch`. APK assets are for OpenWrt 25.12.1+; IPK assets are for OpenWrt 24.10.*.
+The release `ipregion`, `luci-app-ipregion` and `luci-i18n-ipregion-ru` packages are `noarch`. The native `ipregion-dns-helper` is built per OpenWrt package architecture and reuses the `libcurl` dependency already installed for IPRegion. Current APK assets support `aarch64_cortex-a53`, `x86_64`, `mipsel_24kc` and `mips_24kc`. The pinned legacy IPK release is for OpenWrt 24.10.*.
 
 ## Screenshots
 
@@ -71,7 +72,9 @@ Run on an OpenWrt 25.12.1+ router:
 wget -qO- https://raw.githubusercontent.com/romanilyin/ipregion-openwrt/main/install.sh | sh
 ```
 
-The installer downloads `ipregion*.apk`, `luci-app-ipregion*.apk` and `luci-i18n-ipregion-ru*.apk` from the latest GitHub Release and installs them with `apk`.
+The installer detects `DISTRIB_ARCH`, downloads its `ipregion-dns-helper-<architecture>.apk` plus the common `ipregion*.apk`, `luci-app-ipregion*.apk` and `luci-i18n-ipregion-ru*.apk` assets from the latest GitHub Release, and installs them with `apk`.
+
+Installation requires one of the package architectures listed above. Other OpenWrt architectures need a separately built and published `ipregion-dns-helper` APK.
 
 Release tags use `YYYY.M.D-N`. OpenWrt package metadata displays the same package revision as `YYYY.M.D-rN`, where `r` is the standard `PKG_RELEASE` marker.
 
@@ -81,6 +84,7 @@ APK installer options:
 - `IPREGION_INSTALL_LUCI=0`: install only the CLI/backend package.
 - `IPREGION_APK_UPDATE=0`: skip `apk update` before installation.
 - `IPREGION_DOWNLOAD_RETRIES=5`: retry GitHub metadata and APK downloads more times.
+- `IPREGION_PACKAGE_ARCH=aarch64_cortex-a53`: override package architecture detection on an apk-based OpenWrt derivative.
 
 Pinned release example:
 
@@ -91,7 +95,8 @@ wget -qO- https://raw.githubusercontent.com/romanilyin/ipregion-openwrt/main/ins
 Manual install from downloaded APK files:
 
 ```sh
-apk add --allow-untrusted ./ipregion-*.apk ./luci-app-ipregion-*.apk ./luci-i18n-ipregion-ru-*.apk
+. /etc/openwrt_release
+apk add --allow-untrusted "./ipregion-dns-helper-${DISTRIB_ARCH}.apk" ./ipregion.apk ./luci-app-ipregion.apk ./luci-i18n-ipregion-ru.apk
 ```
 
 ## Install IPK
@@ -102,7 +107,7 @@ Run on an OpenWrt 24.10.* router:
 wget -qO- https://raw.githubusercontent.com/romanilyin/ipregion-openwrt/main/install-ipk.sh | sh
 ```
 
-The IPK installer defaults to the last release validated on real OpenWrt 24.10 hardware, `2026.5.28-1`, and installs its `ipregion*.ipk`, `luci-app-ipregion*.ipk` and `luci-i18n-ipregion-ru*.ipk` assets with `opkg`. Set `IPREGION_RELEASE` only to another release that explicitly includes validated IPK assets.
+The experimental IPK installer defaults to the last release validated on real OpenWrt 24.10 hardware, `2026.5.28-1`, and installs its `ipregion*.ipk`, `luci-app-ipregion*.ipk` and `luci-i18n-ipregion-ru*.ipk` assets with `opkg`. The current native-helper package split is not supported by this installer yet. Set `IPREGION_RELEASE` only to another release that explicitly includes a compatible, validated IPK package set.
 
 Manual install from downloaded IPK files:
 
@@ -123,6 +128,7 @@ Open `Status -> IP Region` in LuCI.
 - Download raw JSON results or copy privacy-safe Markdown tables. Markdown omits raw IP addresses, proxy endpoints and route identifiers.
 - Update the package from GitHub Releases through the version card; downgrade protection prevents installing an older latest release.
 - Open `Services -> IP Region` for default UCI settings.
+- The settings page reports compressed APK and installed flash sizes for each IPRegion package. It can remove a legacy `knot-dig` installation left by an older release.
 
 ## CLI Examples
 
@@ -168,6 +174,7 @@ For SOCKS5 proxy checks:
 - `401`, `403`, `404`, `405` and `429` in AI mode can still mean that the provider endpoint was reached; DNS, TLS, timeout and network failures are classified separately.
 - Google Gemini Web uses `gemini.google.com`; the separate Gemini API probe uses `generativelanguage.googleapis.com`. Domain-based split routing must cover each hostname that should use the VPN.
 - Public DNS checks connect to published resolver IP addresses; DoH and DoT additionally verify provider TLS hostnames. Interface DNS addresses are read from the selected or active default OpenWrt interface and are tested over UDP/TCP only.
+- UDP, TCP and DoT use the small native IPRegion DNS helper. DoT performs CA, hostname and SNI verification through the existing `libcurl` TLS backend; `knot-dig` is not required.
 - DNS mode ignores a proxy saved in UCI and rejects an explicit `--proxy`; DoH binds to a selected interface, while UDP, TCP and DoT bind to that interface's source address.
 - DNS `auto` mode prefers an available IPv4 default route and falls back to IPv6 on IPv6-only routers; use `--ip-mode both` to test both explicitly.
 - An `interception likely` result requires a response-code mismatch against authenticated DNS. Matching responses mean no mismatch was detected, not proof that interception is absent; answer-only differences remain inconclusive because CDN variation can be legitimate.

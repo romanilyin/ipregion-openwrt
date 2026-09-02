@@ -14,6 +14,8 @@ DOWNLOAD_RETRY_DELAY=${IPREGION_DOWNLOAD_RETRY_DELAY:-2}
 TMP_DIR=${TMPDIR:-/tmp}/ipregion-install.$$
 RELEASE_JSON=$TMP_DIR/release.json
 DOWNLOAD_ERR=$TMP_DIR/download.err
+DNS_HELPER_ASSET=
+HAS_DNS_HELPER=0
 
 GITHUB_API=${GITHUB_API%/}
 GITHUB_DOWNLOAD_BASE=${GITHUB_DOWNLOAD_BASE%/}
@@ -72,6 +74,10 @@ check_target() {
 
 	if [ -r /etc/openwrt_release ]; then
 		release=$(sed -n "s/^DISTRIB_RELEASE='\([^']*\)'.*/\1/p" /etc/openwrt_release | sed 's/-.*$//' || true)
+		package_arch=${IPREGION_PACKAGE_ARCH:-}
+		if [ -z "$package_arch" ]; then
+			package_arch=$(sed -n "s/^DISTRIB_ARCH='\([^']*\)'.*/\1/p" /etc/openwrt_release || true)
+		fi
 		case "$release" in
 			''|SNAPSHOT) ;;
 			*[!0-9.]*) log "warning: could not parse OpenWrt release; expected 25.12.1+ with apk" ;;
@@ -81,6 +87,14 @@ check_target() {
 		esac
 	else
 		log "warning: /etc/openwrt_release not found; continuing because apk is available"
+		package_arch=${IPREGION_PACKAGE_ARCH:-}
+	fi
+
+	if [ -n "${package_arch:-}" ]; then
+		case "$package_arch" in
+			*[!A-Za-z0-9._-]*) die "DISTRIB_ARCH contains unsupported characters" ;;
+		esac
+		DNS_HELPER_ASSET=ipregion-dns-helper-$package_arch
 	fi
 }
 
@@ -214,6 +228,8 @@ metadata_error_message() {
 
 remove_downloaded_packages() {
 	rm -f "$TMP_DIR/ipregion.apk" "$TMP_DIR/luci-app-ipregion.apk" "$TMP_DIR/luci-i18n-ipregion-ru.apk"
+	[ -z "$DNS_HELPER_ASSET" ] || rm -f "$TMP_DIR/$DNS_HELPER_ASSET.apk"
+	HAS_DNS_HELPER=0
 }
 
 asset_url_for() {
@@ -226,7 +242,7 @@ asset_url_for() {
 			return name
 		}
 		function wanted(name) {
-			return name == pkg ".apk" || name ~ ("^" pkg "[-_].*\\.apk$")
+			return name == pkg ".apk" || name ~ ("^" pkg "[-_][0-9].*\\.apk$")
 		}
 		function consider(url, name) {
 			gsub(/\\\//, "/", url)
@@ -293,9 +309,38 @@ fetch_direct_package() {
 	[ -s "$out" ] || { log "downloaded empty package: $pkg"; return 1; }
 }
 
+validate_core_package() {
+	if ! apk adbdump "$TMP_DIR/ipregion.apk" >/dev/null 2>&1; then
+		log "downloaded ipregion APK is invalid"
+		return 1
+	fi
+}
+
+core_requires_dns_helper() {
+	apk adbdump "$TMP_DIR/ipregion.apk" 2>/dev/null | awk '
+		$1 == "-" && $2 == "ipregion-dns-helper" { found = 1 }
+		END { exit found ? 0 : 1 }
+	'
+}
+
+fetch_required_dns_helper() {
+	mode=$1
+	core_requires_dns_helper || return 0
+	[ -n "$DNS_HELPER_ASSET" ] || { log "DISTRIB_ARCH is required for this release native DNS helper"; return 1; }
+
+	if [ "$mode" = metadata ]; then
+		fetch_package "$DNS_HELPER_ASSET" || return 1
+	else
+		fetch_direct_package "$DNS_HELPER_ASSET" || return 1
+	fi
+	HAS_DNS_HELPER=1
+}
+
 fetch_metadata_packages() {
 	fetch_release_metadata || return 1
 	fetch_package ipregion || return 1
+	validate_core_package || return 1
+	fetch_required_dns_helper metadata || return 1
 	if is_luci_enabled; then
 		fetch_package luci-app-ipregion || return 1
 		fetch_package luci-i18n-ipregion-ru || return 1
@@ -304,6 +349,8 @@ fetch_metadata_packages() {
 
 fetch_direct_packages() {
 	fetch_direct_package ipregion || return 1
+	validate_core_package || return 1
+	fetch_required_dns_helper direct || return 1
 	if is_luci_enabled; then
 		fetch_direct_package luci-app-ipregion || return 1
 		fetch_direct_package luci-i18n-ipregion-ru || return 1
@@ -340,9 +387,15 @@ install_packages() {
 		apk update
 	fi
 
-	if is_luci_enabled; then
+	if is_luci_enabled && [ "$HAS_DNS_HELPER" = 1 ]; then
+		log "installing ipregion, native DNS helper, luci-app-ipregion and Russian translation"
+		apk add $APK_FLAGS "$TMP_DIR/$DNS_HELPER_ASSET.apk" "$TMP_DIR/ipregion.apk" "$TMP_DIR/luci-app-ipregion.apk" "$TMP_DIR/luci-i18n-ipregion-ru.apk"
+	elif is_luci_enabled; then
 		log "installing ipregion, luci-app-ipregion and Russian translation"
 		apk add $APK_FLAGS "$TMP_DIR/ipregion.apk" "$TMP_DIR/luci-app-ipregion.apk" "$TMP_DIR/luci-i18n-ipregion-ru.apk"
+	elif [ "$HAS_DNS_HELPER" = 1 ]; then
+		log "installing ipregion and native DNS helper"
+		apk add $APK_FLAGS "$TMP_DIR/$DNS_HELPER_ASSET.apk" "$TMP_DIR/ipregion.apk"
 	else
 		log "installing ipregion"
 		apk add $APK_FLAGS "$TMP_DIR/ipregion.apk"

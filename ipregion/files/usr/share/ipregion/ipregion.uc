@@ -5,11 +5,12 @@
 import * as fs from 'fs';
 import { cursor } from 'uci';
 
-const VERSION = '2026.9.2-2';
+const VERSION = '2026.9.2-3';
 const CATALOG_PATH = getenv('IPREGION_CATALOG_PATH') || '/usr/share/ipregion/services.json';
 const AI_CATALOG_PATH = getenv('IPREGION_AI_CATALOG_PATH') || '/usr/share/ipregion/services-ai.json';
 const DNS_CATALOG_PATH = getenv('IPREGION_DNS_CATALOG_PATH') || '/usr/share/ipregion/services-dns.json';
 const RUNTIME_DIR = getenv('IPREGION_RUNTIME_DIR') || '/tmp/run/ipregion';
+const DNS_HELPER_PATH = getenv('IPREGION_DNS_HELPER_PATH') || '/usr/libexec/ipregion/dns-helper';
 const STATE_FILE = RUNTIME_DIR + '/state.json';
 const AI_STATE_FILE = RUNTIME_DIR + '/ai-state.json';
 const DNS_STATE_FILE = RUNTIME_DIR + '/dns-state.json';
@@ -2082,7 +2083,7 @@ function dns_network_status(exit_code, output) {
 	output = lc(output || '');
 	if (exit_code == 28 || index(output, 'timeout') >= 0 || index(output, 'timed out') >= 0)
 		return 'timeout';
-	if (exit_code == 60 || index(output, 'certificate') >= 0 || index(output, 'not trusted') >= 0)
+	if (exit_code == 60 || exit_code == 77 || index(output, 'certificate') >= 0 || index(output, 'not trusted') >= 0 || index(output, 'ca cert') >= 0)
 		return 'certificate_failed';
 	if (exit_code == 35 || index(output, 'tls') >= 0)
 		return 'tls_failed';
@@ -2193,54 +2194,12 @@ function curl_doh_probe(provider, opts, ip_version, endpoint, name, query_type) 
 	return { status: dns_status_for_response(response, 'doh'), response: response, latency_ms: latency_ms, detail: response.error || null, remote_ip: marker_value(output, 'REMOTE_IP') };
 }
 
-function kdig_answer_value(record, query_type) {
-	if (query_type == 'AAAA')
-		return record.rdataAAAA ?? null;
-	return record.rdataA ?? null;
-}
-
-function kdig_response(parsed, name, query_type) {
-	let expected_name = lc(rtrim(name, '.') + '.');
-	if (lc(parsed.QNAME || '') != expected_name || parsed.QTYPEname != query_type)
-		return { error: 'DNS question does not match the request' };
-
-	let aliases = [];
-	for (let record in parsed.answerRRs || [])
-		if (record.TYPEname == 'CNAME' && int(record.CLASS) == 1 && record.rdataCNAME != null)
-			push(aliases, {
-				owner: lc(rtrim(record.NAME || '', '.') + '.'),
-				target: lc(rtrim(record.rdataCNAME, '.') + '.')
-			});
-	let valid_names = [ expected_name ];
-	for (let i = 0; i < length(aliases); i++) {
-		let changed = false;
-		for (let alias in aliases)
-			if (contains(valid_names, alias.owner) && !contains(valid_names, alias.target)) {
-				push(valid_names, alias.target);
-				changed = true;
-			}
-		if (!changed)
-			break;
-	}
-
-	let answers = [];
-	for (let record in parsed.answerRRs || []) {
-		let value = kdig_answer_value(record, query_type);
-		let owner = lc(rtrim(record.NAME || '', '.') + '.');
-		if (value != null && record.TYPEname == query_type && int(record.CLASS) == 1 && contains(valid_names, owner))
-			push(answers, { name: record.NAME, type: record.TYPEname || query_type, value: value, ttl: record.TTL, class: record.CLASS });
-	}
-
-	return {
-		rcode: int(parsed.RCODE),
-		rcode_name: dns_rcode_name(int(parsed.RCODE)),
-		ad: parsed.AD == 1,
-		ra: parsed.RA == 1,
-		truncated: parsed.TC == 1,
-		question: { name: parsed.QNAME, type: parsed.QTYPEname },
-		answers: answers,
-		counts: { question: parsed.QDCOUNT, answer: parsed.ANCOUNT, authority: parsed.NSCOUNT, additional: parsed.ARCOUNT }
-	};
+function default_route_device(ip_version) {
+	let proc = fs.popen('ip ' + (ip_version == 6 ? '-6' : '-4') + ' route show default 2>/dev/null', 'r');
+	let output = proc ? proc.read('all') : '';
+	if (proc) proc.close();
+	let found = match(output, / dev ([A-Za-z0-9_.:-]+)/);
+	return found ? found[1] : null;
 }
 
 function interface_source_address(interface, ip_version) {
@@ -2270,40 +2229,56 @@ function interface_routes_endpoint(interface, source, endpoint, ip_version) {
 	return exit_code == 0 && index(output, ' dev ' + interface + ' ') >= 0;
 }
 
-function kdig_probe(provider, transport, opts, ip_version, endpoint, name, query_type) {
-	let args = [ 'kdig', ip_version == 6 ? '-6' : '-4', '+json', '+timeout=' + opts.timeout, '+retry=0' ];
-	if (transport == 'udp')
-		push(args, '+ignore', '-p', '53');
-	else if (transport == 'tcp')
-		push(args, '+tcp', '-p', '53');
-	else
-		push(args, '+tls-ca', '+tls-hostname=' + provider.dot_hostname, '+tls-sni=' + provider.dot_hostname, '-p', '853');
+function helper_dns_probe(provider, transport, opts, ip_version, endpoint, name, query_type) {
 	let source = interface_source_address(opts.interface, ip_version);
+	let route_interface = opts.interface != null ? opts.interface : (provider.dynamic == 'interface' ? default_route_device(ip_version) : null);
 	if (opts.interface != null && source == null)
 		return { status: 'unavailable', response: null, latency_ms: null, detail: 'Interface has no IPv' + ip_version + ' address' };
 	if (source != null && !interface_routes_endpoint(opts.interface, source, endpoint, ip_version))
 		return { status: 'unavailable', response: null, latency_ms: null, detail: 'Selected interface is not the route to this endpoint' };
-	if (source != null)
-		push(args, '-b', source);
-	push(args, '@' + endpoint, name, query_type);
+	if (fs.access(DNS_HELPER_PATH, 'x') != true)
+		return { status: 'unavailable', response: null, latency_ms: null, detail: 'IPRegion DNS helper is not installed' };
+
+	let nonce = clock(true);
+	let query_id = (time() + int(type(nonce) == 'array' ? nonce[1] / 1000000 : 0)) & 65535;
+	let suffix = type(nonce) == 'array' ? nonce[0] + '.' + nonce[1] : time();
+	let request_file = RUNTIME_DIR + '/dns-query-' + provider.id + '-' + transport + '-' + ip_version + '-' + suffix + '.bin';
+	let response_file = RUNTIME_DIR + '/dns-response-' + provider.id + '-' + transport + '-' + ip_version + '-' + suffix + '.bin';
+	let query = dns_query_message(name, query_type, query_id);
+	let args = [
+		DNS_HELPER_PATH, transport, '' + ip_version, endpoint, source || '-',
+		transport == 'dot' ? '853' : '53', '' + (opts.timeout * 1000),
+		request_file, response_file, route_interface || '-', transport == 'dot' ? provider.dot_hostname : '-'
+	];
 
 	let quoted = [];
 	for (let arg in args)
 		push(quoted, shell_quote(arg));
+	fs.mkdir(RUNTIME_DIR);
+	fs.unlink(request_file);
+	fs.unlink(response_file);
+	if (fs.writefile(request_file, query) == null) {
+		fs.unlink(request_file);
+		fs.unlink(response_file);
+		return { status: 'unavailable', response: null, latency_ms: null, detail: 'Could not write the DNS helper request' };
+	}
+
 	let started = clock(true);
 	let proc = fs.popen(join(' ', quoted) + ' 2>&1', 'r');
 	let output = proc ? proc.read('all') : '';
 	let exit_code = proc ? proc.close() : 127;
 	let ended = clock(true);
+	let body = fs.readfile(response_file);
+	fs.unlink(request_file);
+	fs.unlink(response_file);
 	let latency_ms = type(started) == 'array' && type(ended) == 'array' ? ((ended[0] - started[0]) * 1000) + int((ended[1] - started[1]) / 1000000) : null;
 
 	if (exit_code != 0)
-		return { status: dns_network_status(exit_code, output), response: null, latency_ms: latency_ms, detail: trim_str(output) || 'kdig exit ' + exit_code };
+		return { status: dns_network_status(exit_code, output), response: null, latency_ms: latency_ms, detail: trim_str(output) || 'DNS helper exit ' + exit_code };
+	if (body == null)
+		return { status: 'malformed_response', response: null, latency_ms: latency_ms, detail: 'DNS helper did not return a response' };
 
-	let parsed = parse_json_safe(output);
-	if (parsed == null)
-		return { status: 'malformed_response', response: null, latency_ms: latency_ms, detail: 'kdig output was not valid JSON' };
-	let response = kdig_response(parsed, name, query_type);
+	let response = parse_dns_message(body, query_id, name, query_type);
 	return { status: dns_status_for_response(response, transport), response: response, latency_ms: latency_ms, detail: response.error || null };
 }
 
@@ -2318,7 +2293,7 @@ function probe_dns_transport(provider, transport, opts, ip_version, name, query_
 	for (let endpoint in addresses) {
 		let attempt = transport == 'doh'
 			? curl_doh_probe(provider, opts, ip_version, endpoint, name, query_type)
-			: kdig_probe(provider, transport, opts, ip_version, endpoint, name, query_type);
+			: helper_dns_probe(provider, transport, opts, ip_version, endpoint, name, query_type);
 		push(attempts, { endpoint: endpoint, status: attempt.status, detail: attempt.detail || null, latency_ms: attempt.latency_ms });
 		last = attempt;
 		if (dns_status_succeeded(attempt.status)) {
@@ -2330,14 +2305,6 @@ function probe_dns_transport(provider, transport, opts, ip_version, name, query_
 	if (last == null)
 		return dns_row(provider, transport, ip_version, null, 'unavailable', null, null, attempts, 'No endpoint address is configured');
 	return dns_row(provider, transport, ip_version, addresses[length(addresses) - 1], last.status, last.response, last.latency_ms, attempts, last.detail);
-}
-
-function default_route_device(ip_version) {
-	let proc = fs.popen('ip ' + (ip_version == 6 ? '-6' : '-4') + ' route show default 2>/dev/null', 'r');
-	let output = proc ? proc.read('all') : '';
-	if (proc) proc.close();
-	let found = match(output, / dev ([A-Za-z0-9_.:-]+)/);
-	return found ? found[1] : null;
 }
 
 function add_interface_dns_address(addresses, value) {
@@ -2661,18 +2628,18 @@ function build_dns_result(opts, catalog) {
 		push(result.errors, { code: 'no_dns_providers', message: 'No DNS providers matched the requested filters' });
 
 	let total = 0;
-	let kdig_required = false;
+	let helper_required = false;
 	for (let provider in providers) {
 		let provider_transports = dns_provider_transports(provider, opts);
 		total += length(provider_transports) * length(versions);
 		for (let transport in provider_transports)
 			if (transport != 'doh')
-				kdig_required = true;
+				helper_required = true;
 	}
 	if (total == 0)
 		push(result.errors, { code: 'no_compatible_dns_transports', message: 'No selected DNS provider supports the requested transport' });
-	if (kdig_required && fs.access('/usr/bin/kdig', 'x') != true)
-		push(result.errors, { code: 'kdig_missing', message: 'kdig is required for UDP, TCP and DNS-over-TLS checks' });
+	if (helper_required && fs.access(DNS_HELPER_PATH, 'x') != true)
+		push(result.errors, { code: 'dns_helper_missing', message: 'IPRegion DNS helper is required for UDP, TCP and DNS-over-TLS checks' });
 	update_dns_state({ running: true, started_at: result.generated_at, mode: 'dns', finished: 0, total: total });
 	write_partial_output(opts, result);
 
@@ -2966,7 +2933,7 @@ function self_test(catalog) {
 	let ca_ok = fs.stat('/etc/ssl/certs/ca-certificates.crt') != null || fs.stat('/etc/ssl/cert.pem') != null;
 	let curl_ok = fs.access('/usr/bin/curl', 'x') == true || fs.access('/bin/curl', 'x') == true;
 	let ucode_ok = fs.access('/usr/bin/ucode', 'x') == true || fs.access('/bin/ucode', 'x') == true;
-	let kdig_ok = fs.access('/usr/bin/kdig', 'x') == true || fs.access('/bin/kdig', 'x') == true;
+	let dns_helper_ok = fs.access(DNS_HELPER_PATH, 'x') == true;
 	let openwrt_release = fs.readfile('/etc/openwrt_release') || '';
 	let test_opts = default_options();
 	test_opts.timeout = 2;
@@ -2981,12 +2948,12 @@ function self_test(catalog) {
 	push(checks, { name: 'ca_bundle', ok: ca_ok });
 	push(checks, { name: 'curl', ok: curl_ok });
 	push(checks, { name: 'ucode', ok: ucode_ok });
-	push(checks, { name: 'kdig', ok: kdig_ok });
+	push(checks, { name: 'dns_helper', ok: dns_helper_ok, path: DNS_HELPER_PATH });
 	push(checks, { name: 'openwrt_release_present', ok: openwrt_release != '' });
 	push(checks, { name: 'external_ipv4_discovery', ok: external_ipv4 != null });
 	push(checks, { name: 'external_ipv6_discovery', ok: external_ipv6 != null, required: false });
 
-	return { version: VERSION, ok: catalog_ok && dns_catalog_ok && runtime_ok && ca_ok && curl_ok && ucode_ok && kdig_ok && external_ipv4 != null, checks: checks };
+	return { version: VERSION, ok: catalog_ok && dns_catalog_ok && runtime_ok && ca_ok && curl_ok && ucode_ok && dns_helper_ok && external_ipv4 != null, checks: checks };
 }
 
 function print_plain_result(result) {

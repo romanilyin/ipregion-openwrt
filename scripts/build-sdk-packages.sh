@@ -112,3 +112,45 @@ make package/luci-app-ipregion/compile V=s
 printf 'Built packages for %s:\n' "$target"
 ls -1 bin/packages/*/base/*ipregion*.apk 2>/dev/null || true
 ls -1 bin/packages/*/base/*ipregion*.ipk 2>/dev/null || true
+
+latest_package() {
+	latest=
+	for package in "$@"; do
+		[ -f "$package" ] || continue
+		if [ -z "$latest" ] || [ "$package" -nt "$latest" ]; then
+			latest=$package
+		fi
+	done
+	[ -n "$latest" ] || { printf 'Expected package was not built\n' >&2; return 1; }
+	printf '%s\n' "$latest"
+}
+
+copy_common_package() {
+	package=$1
+	alias=$2
+	name=${package##*/}
+	cp "$package" "$IPREGION_ARTIFACT_DIR/$name"
+	cp "$package" "$IPREGION_ARTIFACT_DIR/$alias.apk"
+}
+
+if [ -n "${IPREGION_ARTIFACT_DIR:-}" ]; then
+	mkdir -p "$IPREGION_ARTIFACT_DIR"
+	core_package=$(latest_package bin/packages/*/base/ipregion-[0-9]*.apk)
+	helper_package=$(latest_package bin/packages/*/base/ipregion-dns-helper-[0-9]*.apk)
+	luci_package=$(latest_package bin/packages/*/base/luci-app-ipregion-[0-9]*.apk)
+	i18n_package=$(latest_package bin/packages/*/base/luci-i18n-ipregion-ru-[0-9]*.apk)
+
+	copy_common_package "$core_package" ipregion
+	copy_common_package "$luci_package" luci-app-ipregion
+	copy_common_package "$i18n_package" luci-i18n-ipregion-ru
+
+	helper_name=${helper_package##*/}
+	helper_root=${helper_package%/base/*}
+	helper_arch=${helper_root##*/}
+	case "$helper_arch" in
+		''|*[!A-Za-z0-9._-]*) printf 'Invalid helper package architecture: %s\n' "$helper_arch" >&2; exit 1 ;;
+	esac
+	helper_version=${helper_name#ipregion-dns-helper-}
+	cp "$helper_package" "$IPREGION_ARTIFACT_DIR/ipregion-dns-helper-$helper_arch.apk"
+	cp "$helper_package" "$IPREGION_ARTIFACT_DIR/ipregion-dns-helper-$helper_arch-$helper_version"
+fi

@@ -19,7 +19,9 @@ jobs:
           node-version: '20'
 
       - name: Run static checks
-        run: scripts/ci/static-checks.sh
+        run: |
+          scripts/ci/static-checks.sh
+          python3 scripts/ci/installer-checks.py
 
   ucode:
     name: ucode syntax checks
@@ -31,7 +33,12 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake git pkg-config libjson-c-dev nodejs
+          sudo apt-get install -y build-essential cmake git pkg-config libcurl4-openssl-dev libjson-c-dev nodejs openssl
+
+      - name: Build and test native DNS helper
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror $(pkg-config --cflags libcurl) ipregion/src/dns-helper.c -o /tmp/ipregion-dns-helper $(pkg-config --libs libcurl)
+          python3 scripts/ci/dns-helper-checks.py /tmp/ipregion-dns-helper
 
       - name: Build local ucode with UCI support
         run: scripts/ci/build-ucode.sh /tmp/ipregion-ucode-install

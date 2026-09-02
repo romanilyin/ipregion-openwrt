@@ -224,7 +224,7 @@ function dnsErrorText(error) {
 	switch (error && error.code) {
 	case 'no_dns_providers': return error.code + ': ' + _('No DNS providers matched the requested filters');
 	case 'no_compatible_dns_transports': return error.code + ': ' + _('No selected DNS provider supports the requested transport');
-	case 'kdig_missing': return error.code + ': ' + _('kdig is required for UDP, TCP and DNS-over-TLS checks');
+	case 'dns_helper_missing': return error.code + ': ' + _('IPRegion DNS helper is required for UDP, TCP and DNS-over-TLS checks');
 	default: return error && (error.code + ': ' + (error.message || _('Unknown error'))) || _('Unknown error');
 	}
 }
